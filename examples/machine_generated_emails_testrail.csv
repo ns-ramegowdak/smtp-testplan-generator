@@ -1,0 +1,150 @@
+Test Categories,Component,Test Summary,Steps,Expected Result,Priority (P0/P1/P2/P3),Automatable,Automated,UI Case,QE Owner,Suggested by Dev,Result,Label
+Functional,SMTP Proxy,Verify Machine Email Detected column is present on Alerts table and shows Yes or No when feature flag is enabled,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Open browser and navigate to /ns#/alerts
+3. Assert column header ""MACHINE EMAIL DETECTED"" is visible in the Alerts table without any column customization
+4. For rows with SMTP Proxy access method, assert column cell value is ""Yes"" or ""No""
+5. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Column header ""MACHINE EMAIL DETECTED"" is visible in the Alerts table by default
+- SMTP Proxy rows show ""Yes"" or ""No"" in the column
+- Column is positioned to the right of the existing default columns",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Machine Email Detected column is present on Application Events table and shows Yes or No when feature flag is enabled,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/skopeIT (Application Events page)
+3. Apply filter: page.multilevel_filter.advanced_query_search(""(access_method eq 'SMTP Proxy')"")
+4. Assert column header ""MACHINE EMAIL DETECTED"" is visible in the table
+5. For each SMTP Proxy row, assert column value is ""Yes"" or ""No""
+6. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Column ""MACHINE EMAIL DETECTED"" is visible in Application Events table
+- SMTP Proxy rows show ""Yes"" or ""No"" in the column
+- Column appears between CCI and FROM ISOLATION columns",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Alerts side panel shows Machine Email Detected Yes and Machine Email Confidence for machine-generated email,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/alerts
+3. Click the row expand icon for an alert where Machine Email Detected column = Yes
+4. In the Alert Details side panel, scroll to the APPLICATION section
+5. Assert ""Machine Email Detected: Yes"" is present under ""Other Category:""
+6. Assert ""Machine Email Confidence:"" is present with value Low, Medium, or High
+7. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Alert Details side panel APPLICATION section shows ""Other Category:"" group
+- ""Machine Email Detected: Yes"" is present under Other Category
+- ""Machine Email Confidence: High"" (or Medium or Low) is present immediately after Machine Email Detected
+- No other unexpected fields appear under Other Category",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Alerts side panel shows Machine Email Detected No with no Confidence field for non-machine email,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/alerts
+3. Click the row expand icon for an alert where Machine Email Detected column = No
+4. In the Alert Details side panel, scroll to the APPLICATION section
+5. Assert ""Machine Email Detected: No"" is present under ""Other Category:""
+6. Assert ""Machine Email Confidence:"" is NOT present anywhere in the side panel
+7. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Side panel shows ""Machine Email Detected: No"" under Other Category
+- ""Machine Email Confidence:"" field is completely absent from the side panel
+- Panel does not show an empty or blank Confidence field",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Application Events side panel shows Machine Email Detected Yes and Machine Email Confidence for machine-generated email,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/skopeIT
+3. Click the row expand icon for a SMTP Proxy event where Machine Email Detected = Yes
+4. In the Application Event Details side panel, scroll to the APPLICATION section
+5. Assert ""Machine Email Detected: Yes"" is present under ""Other Category:""
+6. Assert ""Machine Email Confidence:"" is present with value Low, Medium, or High
+7. Assert ""SMTP Status: 250"" is present in the same APPLICATION section
+8. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Application Event Details panel APPLICATION section shows ""Machine Email Detected: Yes"" under Other Category
+- ""Machine Email Confidence: High"" (or Medium or Low) is present
+- Both fields appear under ""Other Category:""
+- SMTP Status field is also present in the APPLICATION section",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Application Events side panel shows Machine Email Detected No with no Confidence field,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/skopeIT
+3. Click the row expand icon for a SMTP Proxy event where Machine Email Detected = No
+4. In the Application Event Details side panel, scroll to the APPLICATION section
+5. Assert ""Machine Email Detected: No"" is present under ""Other Category:""
+6. Assert ""Machine Email Confidence:"" is NOT present anywhere in the side panel
+7. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Side panel shows ""Machine Email Detected: No"" under Other Category
+- ""Machine Email Confidence:"" is completely absent from the panel
+- No empty or placeholder Confidence field is rendered",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify feature flag disabled hides Machine Email Detected column on Alerts and Application Events tables,"Automation Steps:
+1. Confirm feature flag is disabled: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": false}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/alerts and assert column ""MACHINE EMAIL DETECTED"" is NOT present in the table headers
+3. Navigate to /ns#/skopeIT and assert column ""MACHINE EMAIL DETECTED"" is NOT present in the table headers
+4. Teardown: none (flag already disabled)","- ""MACHINE EMAIL DETECTED"" column header is absent from Alerts table
+- ""MACHINE EMAIL DETECTED"" column header is absent from Application Events table
+- No blank placeholder column is shown in place of the removed column",P0,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify previously-recorded side panel values are still visible when feature flag is disabled,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Send a machine-generated email through SMTP proxy at <SMTP_PROXY_VIP>:25 to generate an event with Machine Email Detected = Yes
+3. Wait 30s for event to appear in Application Events or Alerts; note the Transaction ID
+4. Disable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": false}}
+5. Reload the Alerts or Application Events page
+6. Locate the previously-recorded event by Transaction ID and click its row expand icon
+7. Assert ""Machine Email Detected: Yes"" field is still visible in the side panel
+8. Teardown: none","- Side panel still shows ""Machine Email Detected: Yes"" for the previously-recorded event after flag is disabled
+- ""Machine Email Confidence:"" is also still shown if it was present when originally recorded
+- Table column is absent but side panel data is intact",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Machine Email Confidence displays all three valid values Low Medium and High in side panel,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Send three machine-generated emails through SMTP proxy at <SMTP_PROXY_VIP>:25 that produce Low, Medium, and High confidence scores (coordinate with Dev on test email headers/content that triggers each level)
+3. Navigate to /ns#/alerts or /ns#/skopeIT
+4. For each event, open side panel and assert Machine Email Confidence value matches expected
+5. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Side panel shows ""Machine Email Confidence: Low"" for low-confidence machine email
+- Side panel shows ""Machine Email Confidence: Medium"" for medium-confidence machine email
+- Side panel shows ""Machine Email Confidence: High"" for high-confidence machine email
+- No values other than Low, Medium, High appear in the Confidence field",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Machine Email Detected filter option exists on Alerts page,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/alerts
+3. Call page.multilevel_filter.get_all_first_level_options_text_list()
+4. Assert ""Machine Email Detected"" is in the returned list
+5. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- ""Machine Email Detected"" appears as a first-level filter option in the + ADD FILTER dropdown on Alerts page
+- Filter option is accessible without any additional configuration",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Machine Email Detected filter option exists on Application Events page,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/skopeIT
+3. Call page.multilevel_filter.get_all_first_level_options_text_list()
+4. Assert ""Machine Email Detected"" is in the returned list
+5. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- ""Machine Email Detected"" appears as a first-level filter option in the + ADD FILTER dropdown on Application Events page
+- Filter option is accessible without any additional configuration",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify filtering by Machine Email Detected Yes on Alerts returns only machine-generated email rows,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Navigate to /ns#/alerts
+3. Apply filter: Filter(first_level_value=""Machine Email Detected"", type_of_multifilter=FilterType.SearchText, second_level_value=""Yes"")
+4. Call page.wait_for_page_table_be_loaded()
+5. Assert row count > 0
+6. For each visible row assert Machine Email Detected column value == ""Yes""
+7. Teardown: remove filter, POST /internal/v1/featureconfigs with {""machine-traffic-detection"": {""enabled"": false}}","- All returned rows show ""Yes"" in Machine Email Detected column
+- No rows with ""No"" value are returned
+- Row count is greater than 0",P1,Yes,No,No,Ramegowda K,No,,ai_generatedFunctional,SMTP Proxy,Verify Export button is present and enabled on Alerts page when Machine Email Detected events exist,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Send a machine-generated email through SMTP proxy at <SMTP_PROXY_VIP>:25 to generate at least one alert
+3. Navigate to /ns#/alerts and wait for the table to load
+4. Assert at least one row is present in the table
+5. Locate the Export button: WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, ""//button[normalize-space()='Export']"")))
+6. Assert the Export button is displayed and enabled (not disabled or hidden)
+7. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Export button is visible and enabled on the Alerts page when rows are present
+- Button is clickable (not greyed out or disabled)
+- No error is thrown on page when export button is located",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Export button is present and enabled on Application Events page when Machine Email Detected events exist,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Send a machine-generated email through SMTP proxy at <SMTP_PROXY_VIP>:25 to generate at least one application event
+3. Navigate to /ns#/skopeIT and wait for the table to load
+4. Apply filter: page.multilevel_filter.advanced_query_search(""(access_method eq 'SMTP Proxy')"") to surface SMTP rows
+5. Assert at least one row is present in the filtered results
+6. Locate the Export button: WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, ""//button[normalize-space()='Export']"")))
+7. Assert the Export button is displayed and enabled
+8. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Export button is visible and enabled on the Application Events page when SMTP rows are present
+- Button is clickable (not greyed out or disabled)
+- No error is thrown on page when export button is located",P1,Yes,No,No,Ramegowda K,No,,ai_generated
+Functional,SMTP Proxy,Verify Machine Email Detected and Confidence fields display correctly for email with non-ASCII characters in subject and body,"Automation Steps:
+1. Enable feature flag: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": true}}, header x-netskope-tenantid: <TENANT_ID>
+2. Build email with non-ASCII subject and body using EmailBuilderSmtp:
+   builder = EmailBuilderSmtp(smtp_server=<SMTP_PROXY_VIP>, smtp_port=25)
+   builder.send_email(from_email=""user0@emailskope.com"", to_email=""fireeyesales2@gmail.com"",
+       subject=u""Test メール éàü مرحبا"",
+       body=u""Body with non-ASCII: 中文 éàü العربية"")
+3. Wait 30s for the event to appear in Alerts or Application Events
+4. Navigate to /ns#/alerts (or /ns#/skopeIT) and locate the event row
+5. Open the side panel by clicking the row expand icon
+6. In the APPLICATION section under ""Other Category:"", assert ""Machine Email Detected:"" field is present with value Yes or No
+7. If Detected = Yes, assert ""Machine Email Confidence:"" is present with value Low, Medium, or High
+8. Assert that the subject line displayed in the side panel is not garbled (renders correctly or is URL-encoded consistently)
+9. Teardown: POST /internal/v1/featureconfigs with payload {""machine-traffic-detection"": {""enabled"": false}}","- Email is accepted by the SMTP proxy (no 5xx error during send)
+- ""Machine Email Detected:"" field is present in the side panel with a valid value (Yes or No)
+- If Detected = Yes, ""Machine Email Confidence:"" is present with value Low, Medium, or High
+- Field values are not garbled, empty, or showing encoding errors
+- Non-ASCII characters in subject do not cause the Detected or Confidence fields to be missing or malformed",P1,Yes,No,No,Ramegowda K,No,,ai_generated
