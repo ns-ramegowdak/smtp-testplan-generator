@@ -1,16 +1,20 @@
 ---
 name: smtp-testplan-generator
 description: >
-  Generate a complete test plan for SMTP Proxy features from a PRD (Jira or Confluence content).
-  Produces a TestRail-ready CSV and a Confluence-ready Markdown page.
-  Strictly PRD-driven — only covers what the PRD describes, nothing more.
-  Use when: generating SMTP test plan, creating test cases from PRD, smtp testplan, smtp test coverage,
+  Generate a complete test plan for SMTP Proxy features from a Design Spec (Jira or Confluence content).
+  Produces a TestRail-ready CSV and a QE test-plan page in the team's real Confluence template —
+  either published live to Confluence via MCP or written locally as a .md file, your choice.
+  Strictly Design Spec-driven — only covers what the Design Spec describes, nothing more.
+  Fetches the Design Spec directly from a Jira issue or Confluence page URL via the Atlassian MCP connection
+  when available — no copy-pasting required.
+  Use when: generating SMTP test plan, creating test cases from Design Spec, smtp testplan, smtp test coverage,
   smtp test cases from requirements, testrail csv smtp, smtp proxy testing plan.
 triggers:
   - smtp-testplan-generator
   - smtp testplan
   - generate smtp test plan
   - smtp test cases from prd
+  - smtp test cases from design spec
   - smtp testrail csv
   - smtp proxy test coverage
   - create test plan smtp
@@ -20,14 +24,17 @@ triggers:
 
 ## Purpose
 
-Generate a complete, ready-to-import test plan for any SMTP Proxy feature given its PRD content.
+Generate a complete, ready-to-import test plan for any SMTP Proxy feature given its Design Spec content.
 
 **Two outputs every run:**
 1. TestRail CSV — `smtp_testplan/{TICKET_ID}_{feature_name}_testrail.csv`
-2. Confluence Markdown page — `smtp_testplan/{TICKET_ID}_{feature_name}_confluence.md`
+2. QE test-plan page in the team's real Confluence template — either:
+   - **Published live** to a Confluence space via the Atlassian MCP connection, or
+   - Written locally to `smtp_testplan/{TICKET_ID}_{feature_name}_confluence.md`
+   The user picks which in Phase 0.
 
-**Core constraint:** Test cases are generated STRICTLY from the PRD content provided. Do not add
-test cases for behaviors, configurations, or edge cases not described in the PRD. If a behavior
+**Core constraint:** Test cases are generated STRICTLY from the Design Spec content provided. Do not add
+test cases for behaviors, configurations, or edge cases not described in the Design Spec. If a behavior
 seems implied but is not stated, call it out in Section 9 (Open Questions) instead.
 
 ---
@@ -40,6 +47,7 @@ Before doing anything else, ask the user for the following. All fields are requi
 smtp-testplan-generator needs a few details:
 
 1. Jira ticket ID  (e.g.: QE-83414, NPLAN-4895)
+   If item 4 is a Jira URL for this same ticket, you can skip this — it will be inferred.
 
 2. Feature name (snake_case, used in output filenames)
    e.g.: dkim_verification, envelope_testing, lfs_size_enforcement
@@ -49,32 +57,104 @@ smtp-testplan-generator needs a few details:
    b) API only  (SMTP protocol, feature flags, relay config, logs, smtplib)
    c) Both UI and API
 
-4. PRD content — paste the full text from your Jira ticket or Confluence page.
-   Include: feature description, acceptance criteria, error handling requirements,
-   security requirements, any listed edge cases or notes.
+4. Design Spec source — one of:
+   a) A Jira issue URL or key (e.g. https://netskope.atlassian.net/browse/NPLAN-4895, or just NPLAN-4895)
+      — fetched automatically via the Atlassian MCP connection.
+   b) A Confluence page URL (e.g. https://netskope.atlassian.net/wiki/spaces/SMTPDLP/pages/5229281503/Design+Spec+-+...)
+      — fetched automatically via the Atlassian MCP connection.
+   c) Pasted Design Spec content, if you'd rather not use MCP or the page isn't in Atlassian.
+      Include: feature description, acceptance criteria, error handling requirements,
+      security requirements, any listed edge cases or notes.
 
 5. QE Owner name (your name — used in TestRail CSV)
 
 6. (Optional) Test focus — any areas to emphasize or deprioritize?
    e.g.: "Emphasize boundary cases for the size limit", "Deprioritize export tests"
    Press Enter to skip.
+
+7. Where should the Confluence-formatted test plan go?
+   a) Create it as a live Confluence page via the Atlassian MCP connection (no copy-paste)
+   b) Write it locally as a .md file for you to paste in yourself
+
+8. (Only if 7a) Confluence publish details:
+   a) Space to create the page in (key or ID, e.g. ENG)
+   b) Parent page to nest under (optional — URL or ID, e.g. the ticket's Epic or the Feature Design doc page). Press Enter to place it at the space root.
+   c) QE Epic Link (optional — Jira epic URL for QE tracking). Press Enter to skip.
+   d) Release Schedule (optional, e.g. R140). Press Enter to skip.
+   e) Dev Members (optional, e.g. "Backend: Jane Doe   WebUI: John Smith"). Press Enter to skip.
+   f) Test Rail Link (optional — paste once the TestRail run exists). Press Enter to skip.
+   g) Testing Estimate (optional, e.g. "Total: 2w   Manual: 8d   Automation: 1w"). Press Enter to skip.
 ```
 
-Wait for all inputs before proceeding. Do not begin analysis until the user has provided the PRD content.
+Wait for all inputs before proceeding. Do not begin analysis until the Design Spec source (URL or pasted content) has been provided.
 
 After receiving inputs:
-- Set `TICKET_ID` = Jira ticket ID provided
 - Set `FEATURE_NAME` = feature name provided
 - Set `TEST_SCOPE` = `UI` / `API` / `Both` based on answer to item 3
 - Set `QE_OWNER` = name provided
-- Set `PRD_SOURCE` = `Jira` / `Confluence` / `Manual` based on the pasted content origin (ask if unclear)
 - Set `TEST_FOCUS` = emphasis/deprioritize notes from item 6, or empty if skipped
+- Set `CONFLUENCE_OUTPUT_MODE` = `Publish` (item 7a) or `Local` (item 7b)
+- If `Publish`: set `CONFLUENCE_SPACE`, `CONFLUENCE_PARENT_ID` (or empty), `QE_EPIC_LINK`, `RELEASE_SCHEDULE`, `DEV_MEMBERS`, `TEST_RAIL_LINK`, `TEST_ESTIMATE` from item 8 (empty string for any field the user skipped — never invent a value for these)
+- Set `DESIGN_SPEC_INPUT` = the raw value given for item 4 (a URL, a bare Jira key, or pasted text)
+- Determine `DESIGN_SPEC_SOURCE`:
+  - If `DESIGN_SPEC_INPUT` looks like a Jira URL (`/browse/<KEY>`) or a bare key (`^[A-Z][A-Z0-9]+-\d+$`) → `DESIGN_SPEC_SOURCE = Jira-MCP`
+  - If `DESIGN_SPEC_INPUT` looks like a Confluence URL (`/wiki/spaces/...` or `/wiki/x/...` tiny link) → `DESIGN_SPEC_SOURCE = Confluence-MCP`
+  - Otherwise (free text pasted in) → `DESIGN_SPEC_SOURCE = Manual`
+- Set `TICKET_ID`:
+  - If item 1 was given, use it as-is.
+  - Else if `DESIGN_SPEC_SOURCE = Jira-MCP`, infer it from the issue key in `DESIGN_SPEC_INPUT`.
+  - Else (Confluence Design Spec with no ticket ID given), ask the user for the ticket ID before proceeding — it's required for output filenames.
+
+If `DESIGN_SPEC_SOURCE` is `Jira-MCP` or `Confluence-MCP`, proceed to **Phase 0.5** to fetch the content before Phase 1. If `Manual`, skip Phase 0.5 and go straight to Phase 1 using the pasted text as the Design Spec content.
 
 ---
 
-## Phase 1 — PRD Analysis
+## Phase 0.5 — Fetch Design Spec via Atlassian MCP
 
-Read the PRD content and extract the following. Work entirely from what is stated — no inference.
+Only runs when `DESIGN_SPEC_SOURCE` is `Jira-MCP` or `Confluence-MCP`. Goal: pull the Design Spec content directly instead of relying on copy-paste, while keeping the conversation output compact — don't dump the full fetched body into chat, just a short confirmation (see the Quality Rules / token-efficiency guidance for this skill).
+
+### 0.5.1 Resolve the cloud ID
+
+Extract the site hostname from the URL in `DESIGN_SPEC_INPUT` (e.g. `yourorg.atlassian.net`). Try it directly as `cloudId` on the first fetch call below. If that call fails with an auth/not-found error, call `mcp__atlassian__getAccessibleAtlassianResources` once, pick the matching site, and retry with its returned cloud ID. Reuse the resolved `cloudId` for any subsequent calls in the same run — don't re-resolve it.
+
+If `DESIGN_SPEC_INPUT` was a bare Jira key with no URL (no hostname to try), call `mcp__atlassian__getAccessibleAtlassianResources` directly to get the cloud ID.
+
+### 0.5.2 Fetch the content
+
+**If `DESIGN_SPEC_SOURCE = Jira-MCP`:**
+- Call `mcp__atlassian__getJiraIssue` with `issueIdOrKey = TICKET_ID`, `cloudId`, `fields: ["summary","description","comment","labels","components","issuelinks"]`, `responseContentFormat: "markdown"`.
+- Jira tickets for this team are often thin customer-request narratives, not the real Design Spec — and the Confluence link isn't always where you'd expect. Search **all three** of `description`, every entry in `comment.comments[].body`, and `issuelinks` for a Confluence URL (`/wiki/spaces/...`) — on real tickets it has shown up buried in a mid-thread engineering comment, not the description:
+  - If found, ask the user once: "This ticket links to a Confluence page — `{title/url}`. Fetch that as the Design Spec too? (y/n)". If yes, also run the Confluence fetch below against that page and treat the combined content (Jira description + comments + linked Confluence body) as the Design Spec.
+  - If not found, use the Jira issue's `description` + `comment` fields as the Design Spec content.
+- Also scan `issuelinks` for a linked issue whose key matches `QE-\d+` (commonly summarized "QE activities for ..."). If found, surface it as a suggested `{QE_EPIC_LINK}` value for Phase 0 item 8c and ask the user to confirm/override rather than silently filling it in — don't skip asking just because a candidate was found.
+
+**If `DESIGN_SPEC_SOURCE = Confluence-MCP`:**
+- Extract the page ID from the URL (the numeric ID in `/pages/<id>/`, or the tiny-link ID after `/wiki/x/`).
+- Call `mcp__atlassian__getConfluencePage` with `pageId`, `cloudId`, `contentFormat: "markdown"`.
+
+### 0.5.3 Confirm before analyzing
+
+Print a compact confirmation — not the full fetched body:
+
+```
+Fetched Design Spec source:
+  {Jira NPLAN-4895: "<issue summary>"} or {Confluence: "<page title>"}
+  Content length: ~N words
+  {If a linked Confluence Design Spec was also pulled in, name it here too}
+```
+
+Ask: "Is this the right Design Spec? Proceed with analysis, or should I fetch something else?"
+Wait for confirmation. If the user says this is the wrong page/ticket, ask for the correct URL/key and re-run 0.5.1–0.5.3.
+
+### 0.5.4 Fallback to manual paste
+
+If any MCP call errors (no Atlassian MCP connection available, permission denied, page/issue not found), tell the user plainly what failed and fall back to Phase 0 item 4c: ask them to paste the Design Spec content directly. Do not retry the same failing call more than once.
+
+---
+
+## Phase 1 — Design Spec Analysis
+
+Read the Design Spec content and extract the following. Work entirely from what is stated — no inference.
 
 ### 1.1 Requirements Extraction
 
@@ -126,13 +206,13 @@ Apply ISTQB techniques to each requirement.
 | P0 | Core feature requirement; failure means feature is broken or insecure |
 | P1 | Important but failure degrades correctness without breaking the whole feature |
 | P2 | Edge case, secondary flow, or low-probability failure mode |
-| P3 | Cosmetic or near-zero impact — usually omit unless PRD explicitly requires |
+| P3 | Cosmetic or near-zero impact — usually omit unless Design Spec explicitly requires |
 
-**Default:** Explicit PRD acceptance criterion → P0. Described behavior without AC → P1. Edge case/note → P2.
+**Default:** Explicit Design Spec acceptance criterion → P0. Described behavior without AC → P1. Edge case/note → P2.
 
 **If `TEST_FOCUS` is set:** Apply it as a weighting override after initial priority assignment.
 - "Emphasize X" → bump requirement IDs related to X up one priority level (P1 → P0, P2 → P1) and generate additional test cases for those requirements if coverage is thin.
-- "Deprioritize X" or "Skip X" → drop related cases to P2 or move them to Open Questions if they are not PRD acceptance criteria.
+- "Deprioritize X" or "Skip X" → drop related cases to P2 or move them to Open Questions if they are not Design Spec acceptance criteria.
 
 ### 2.3 Automatable Decision Rules
 
@@ -202,19 +282,28 @@ Wait for confirmation before generating output files.
 
 ## Phase 4 — Output Generation
 
-### Step 1: Load reference files (index-first, targeted)
+### Step 1: Load reference files (index-first, targeted, ranged reads)
 
 **1a. Read the KB index first:**
 `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_index.md`
+(this now includes a Step 2b line-number map — read that table too, it's small)
 
-**1b. Based on `TEST_SCOPE`, read only the relevant KB file(s):**
-- `TEST_SCOPE = UI`   → read `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_ui.md`
-- `TEST_SCOPE = API`  → read `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_api.md`
-- `TEST_SCOPE = Both` → read both files
+**1b. Based on `TEST_SCOPE`, identify the relevant KB file(s):**
+- `TEST_SCOPE = UI`   → `smtp_proxy_kb_ui.md`
+- `TEST_SCOPE = API`  → `smtp_proxy_kb_api.md`
+- `TEST_SCOPE = Both` → both files
 
-Within each KB file, read only the sections the index identifies as relevant for your PRD's feature areas. Skip sections that have no bearing on the PRD.
+**1c. Do NOT read a full KB file by default.** For each feature area your Design Spec touches,
+look up its section(s) in the Step 1/Step 2 tables, then look up each section's line
+range in the Step 2b map. Call `Read` with `offset`/`limit` set to that range (+~3 lines
+buffer) — one targeted read per section (or per contiguous run of sections), not one
+read of the entire file. Skip sections with no bearing on the Design Spec entirely.
 
-**1c. Always read these two files regardless of scope:**
+**Exception — the 60% fallback:** if the sections you need cover more than ~60% of a
+file's total lines (see the totals in Step 2b), just read the whole file in one call.
+Past that threshold, multiple ranged reads cost more overhead than a single full read.
+
+**Always read these two files regardless of scope:**
 - `~/.claude/skills/smtp-testplan-generator/templates/testrail_format_reference.md`
 - `~/.claude/skills/smtp-testplan-generator/templates/confluence_template.md`
 
@@ -236,40 +325,71 @@ Rules:
 - Steps column: multi-line, wrapped in double quotes, numbered list starting with `Automation Steps:` or `MANUAL STEPS:`
 - Expected Result column: multi-line, wrapped in double quotes, bullet list starting with `-`
 - Fixed columns: `Component=SMTP Proxy`, `Automated=No`, `UI Case=No`, `Result=`, `Label=ai_generated`
-- `Suggested by Dev=No` unless PRD explicitly attributes a test to a dev suggestion
+- `Suggested by Dev=No` unless Design Spec explicitly attributes a test to a dev suggestion
 - `QE Owner={QE_OWNER}`
 
-### Step 3: Generate Confluence Markdown
+### Step 3: Build the Confluence page content
 
-File path: `smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_confluence.md`
-
-Use `confluence_template.md` as the structural skeleton. Fill in every `{placeholder}`:
+Use `confluence_template.md` as the structural skeleton — this mirrors the team's real QE test-plan pages in the `ENG` Confluence space. Fill in every `{placeholder}`. Build this content in memory first; Step 4 decides whether it gets published live or written to a local file.
 
 | Placeholder | Source |
 |---|---|
-| `{FEATURE_NAME}` | User input |
-| `{QE_OWNER}` | User input |
-| `{DATE}` | Current date |
-| `{PRD_SOURCE}` | Jira / Confluence / Manual |
-| Overview paragraph | Summarize PRD in 2–4 sentences |
-| In Scope bullets | Behaviors [B-N] + Error conditions [E-N] from requirements map |
-| Out of Scope bullets | Adjacent SMTP features not in PRD + explicit PRD exclusions |
-| Coverage Matrix rows | One row per PRD requirement area; mark ✅ / ➖ / ❌ per test type |
-| Coverage totals | Count from Phase 3 draft |
-| Test Cases summary table | One row per test case: TC-N, Summary, Category, Priority, Automatable |
-| Risks table | Derive from ambiguities [Q-N] and any stated constraints |
-| Open Questions | List [Q-N] items from requirements map |
+| `{TICKET_ID}`, `{FEATURE_TITLE}` | User input / Design Spec title |
+| `{NPLAN_ENG_EPIC}` | The Design Spec URL if `DESIGN_SPEC_SOURCE = Confluence-MCP`; the linked Confluence page URL if a Jira ticket linked out to one (§0.5.2); otherwise `(not specified)` |
+| `{QE_EPIC_LINK}` | Item 8c (the user's answer, including a `QE-\d+` link suggested and confirmed during §0.5.2), or `(not specified)` if skipped |
+| `{PRODUCT_REQUIREMENT_DOC}` | Leave `(not specified)` unless the user separately supplied one — do not reuse the Design Spec link here, they're distinct fields on the real template |
+| `{FEATURE_DESIGN_DOC}` | Same value as `{NPLAN_ENG_EPIC}` — the two rows point at the same doc on both reference pages |
+| `{RELEASE_SCHEDULE}` | Item 8d, or `(not specified)` |
+| `{QE_MEMBERS}` | `{QE_OWNER}` |
+| `{DEV_MEMBERS}` | Item 8e, or `(not specified)` |
+| `{TEST_RAIL_LINK}` | Item 8f, or `(not specified)` |
+| `{TEST_ESTIMATE}` | Item 8g, or `(not specified)` |
+| `{FEATURE_TOI_LINK}` | `(not specified)` — always filled in later by hand |
+| `{VERSION}` | `1.0` |
+| `{SCOPE_NARRATIVE}` | Short paragraph + bullets summarizing key feature changes/behaviors, drawn from Behaviors [B-N] — mirrors the "Feature changes:" block seen on real pages. Omit (empty string) if the Design Spec is too thin to summarize beyond the scope table itself. |
+| `{IN_SCOPE_BULLETS}` / `{NOT_IN_SCOPE_BULLETS}` | Behaviors [B-N] + Error conditions [E-N] for in-scope; adjacent SMTP features not in the Design Spec + explicit exclusions for not-in-scope |
+| `{SETUP_DIAGRAM}` | Simple `A → B → C` text arrow diagram of the component flow, only if the Design Spec describes one; else `(not specified in Design Spec)` |
+| `{STACK_ACCESS_NOTES}` + `{TEST_REQUIREMENTS_TABLE_ROWS}` | Environment/stack requirements — reuse the placeholder variables from `testrail_format_reference.md` (VIP, namespace, tenant, etc.); mark availability `Yes` only if the KB confirms it, else leave blank |
+| `{FEATURE_FLAGS_TABLE_ROWS}` | One row per flag `[F-N]` from the requirements map: Type / Flag Name / Default Status. If no flags exist, one row: `NA \| NA \| —` |
+| `{DEPENDENCY_FEATURES_AND_REGRESSION_IMPACT}` | Combine: features this depends on (if the Design Spec states any, else `NA`) + regression impact statement (what existing behavior must stay unaffected — derive from Design Spec if stated, else `(not specified in Design Spec)`) |
+| `{ACCEPTANCE_CRITERIA_BULLETS}` | Explicit acceptance criteria from the Design Spec. If none are stated verbatim, use the three standard bullets seen on both reference pages (build valid + deployed, dev unit tests done, QE test cases pass) and note in Open Questions that Design-Spec-specific ACs were not found |
+| `{RESILIENCY_SECTION}` | Only include when the Design Spec describes failure modes/edge cases worth calling out as "Potential Failures": render as `## Resiliency of Service/Feature\n\nPotential Failures :\n\n{bullets from [Q-N]/edge cases}`. Otherwise this placeholder resolves to an empty string (omit the whole section — do not print an empty heading) |
+| Test Cases table rows | Group test cases under `Section` header rows you choose to fit the feature (e.g. `Backend API`, `WebUI`, `E2E`, `Negative`, `Security` — the real pages use feature-specific section names, not a fixed list). Within each section, one row per test case: S.No (`TC-N`), Section, Test Categories(Type) = the `[POS]/[NEG]/[BND]/[SEC]` category, Service/Component, Test Summary, Steps, Expected Result, Priority, Automatable, `Automated=No`, `UI Case` (Yes only if it drives a UI page object), `Arrived by QE=No`, `Suggested by Dev` (same rule as the CSV), `Derived by AI=Yes` |
+| `{DETAILED_TEST_CATEGORY_NOTES}` | One `###` subsection per Section used above, 2–4 bullets summarizing what that section validates (mirrors "WebUI Test" / "End to End Functional Test" / "Performance Test" subsections on the reference page) |
+| `{ACTIONABLE_ITEMS_CHECKLIST}` | One checkbox item per Open Question `[Q-N]`, plus the standard `- [ ] Feature Automation needed?` item |
+| `{TOI_LINKS}` | `To be Recorded.` |
+| `{KEY_BUGS_TASKS}` | `(not specified)` |
 
-Do NOT invent content for any section — if a section has no PRD basis, write `(not specified in PRD)`.
+Do NOT invent content for any section — if a section has no Design Spec basis, write `(not specified in Design Spec)` rather than fabricating specifics.
 
-### Step 4: Confirm output
+### Step 4: Deliver the Confluence content — Publish or Local
 
-After both files are written, print:
+**If `CONFLUENCE_OUTPUT_MODE = Local`:**
+- Write the filled-in content to `smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_confluence.md`.
+
+**If `CONFLUENCE_OUTPUT_MODE = Publish`:**
+1. Resolve `cloudId` — reuse the one resolved in Phase 0.5 if this run already fetched from Atlassian MCP; otherwise resolve it now the same way (site hostname first, `mcp__atlassian__getAccessibleAtlassianResources` as fallback).
+2. Print an explicit confirmation before creating anything — this writes to a shared system other people will see:
+   ```
+   About to create a Confluence page:
+     Title:  {TICKET_ID} {FEATURE_TITLE}
+     Space:  {CONFLUENCE_SPACE}
+     Parent: {CONFLUENCE_PARENT_ID or "(space root)"}
+   Proceed? (y/n)
+   ```
+   Wait for explicit confirmation. If the user declines, fall back to Local mode instead (write the file) rather than dropping the output.
+3. On confirmation, call `mcp__atlassian__createConfluencePage` with `cloudId`, `spaceId = CONFLUENCE_SPACE`, `parentId = CONFLUENCE_PARENT_ID` (omit if empty), `title = "{TICKET_ID} {FEATURE_TITLE}"`, `body` = the filled-in content, `contentFormat = "markdown"`.
+4. If the call fails for any reason (bad space key, permission denied, MCP unavailable), tell the user plainly what failed and fall back to writing the local `.md` file instead so the work isn't lost. Do not retry the same failing call more than once.
+5. On success, note the returned page URL for the final output summary.
+
+### Step 5: Confirm output
+
+After the CSV is written and the Confluence content is delivered (published or written locally), print:
 
 ```
-Output files written:
+Output:
   CSV:        smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_testrail.csv
-  Confluence: smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_confluence.md
+  Confluence: {Published — <page URL>}  or  {smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_confluence.md}
 
 Summary:
   Total test cases: N
@@ -277,24 +397,24 @@ Summary:
   Automatable: X/N
 
 Next steps:
-  1. Review the Confluence page and paste into your Confluence space
+  1. {If Local: "Review the Confluence page and paste into your Confluence space" / If Published: "Review the live Confluence page"}
   2. Import the CSV into TestRail (use "Import Test Cases" → CSV)
-  3. Review Open Questions in Section 9 with Dev/PM before finalizing
+  3. Review Open Questions / Actionable Items with Dev/PM before finalizing
 ```
 
 ---
 
 ## Quality Rules (apply throughout all phases)
 
-1. **PRD-only scope** — If a behavior is not in the PRD, do not test it. If it seems important, add it to Open Questions.
+1. **Design Spec-only scope** — If a behavior is not in the Design Spec, do not test it. If it seems important, add it to Open Questions.
 2. **No duplicate assertions** — Two tests that assert the same outcome for the same condition are one test.
 3. **Teardown in every test** — Every test that creates a relay config, RT policy, or feature flag change must include teardown in the last step(s).
 4. **Placeholder variables only** — Never hardcode IP addresses, pod names, tenant IDs, or email addresses. Use placeholders from `testrail_format_reference.md`.
-5. **Exact SMTP codes** — When the PRD specifies a response code, use it exactly. When the PRD says "error", use the correct RFC 5321 code and note the basis.
+5. **Exact SMTP codes** — When the Design Spec specifies a response code, use it exactly. When the Design Spec says "error", use the correct RFC 5321 code and note the basis.
 6. **Steps must be executable** — Each step must be a concrete action an automation engineer can implement directly. Avoid vague steps like "verify behavior" — say `assert response_code == 250`.
    - **Forbidden words in steps:** "correctly", "properly", "as expected", "should work", "the button", "equivalent", "appropriate", "or similar".
    - **UI element references** must use the exact visible label, placeholder, or aria-label as it appears in the product — never a description like "the save button".
-   - **API steps** must spell out the exact endpoint path from the PRD — never a guessed or constructed path. If a path is absent from the PRD, write `<path not in PRD>` and flag it in Open Questions.
+   - **API steps** must spell out the exact endpoint path from the Design Spec — never a guessed or constructed path. If a path is absent from the Design Spec, write `<path not in Design Spec>` and flag it in Open Questions.
    - **Forbidden words in expected results:** "correctly", "properly", "as expected", "should work". Every assertion must be independently verifiable: HTTP status code, exact UI text, element visibility state, API response field + value, log entry content.
 7. **Confirmation before output** — Always get user confirmation on the requirements summary (Phase 1) and test list (Phase 3) before writing files.
 
@@ -304,11 +424,11 @@ Next steps:
 
 | File | Purpose |
 |---|---|
-| `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_index.md` | **Read first** — decision table for which KB file/sections to load |
+| `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_index.md` | **Read first** — decision table for which KB file/sections to load, plus a line-number map for targeted offset/limit reads |
 | `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_ui.md` | UI layer KB: SMTP Settings page, Alerts/Events/Incidents patterns |
 | `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_api.md` | API/backend KB: smtplib, kubectl, feature flags, logs, relay config |
 | `~/.claude/skills/smtp-testplan-generator/templates/testrail_format_reference.md` | CSV column spec, placeholder vars, step/expected format rules |
-| `~/.claude/skills/smtp-testplan-generator/templates/confluence_template.md` | Confluence page section skeleton |
+| `~/.claude/skills/smtp-testplan-generator/templates/confluence_template.md` | QE test-plan page skeleton, matching the team's real `ENG`-space pages |
 | `~/.claude/skills/smtp-testplan-generator/examples/` | Sample outputs for reference only — do NOT read at runtime |
 
 > Always read the KB index first. Never read example files at runtime.
@@ -332,7 +452,7 @@ Next steps:
     └── machine_generated_emails_confluence.md  ← reference only
 ```
 
-Output files are written to `smtp_testplan/` inside the current working directory. The directory is created with `mkdir -p smtp_testplan` before the first write if it does not exist. Files are named `{TICKET_ID}_{FEATURE_NAME}_testrail.csv` and `{TICKET_ID}_{FEATURE_NAME}_confluence.md`.
+The CSV is always written to `smtp_testplan/` inside the current working directory (created with `mkdir -p smtp_testplan` before the first write). The Confluence output either goes to that same directory as a `.md` file, or is published live to Confluence — whichever the user chose in Phase 0 item 7. Files are named `{TICKET_ID}_{FEATURE_NAME}_testrail.csv` and `{TICKET_ID}_{FEATURE_NAME}_confluence.md`.
 
 ---
 
@@ -347,15 +467,23 @@ Output files are written to `smtp_testplan/` inside the current working director
 ```
 smtp-testplan-generator needs a few details:
 
-1. Jira ticket ID (e.g.: QE-83414): _
+1. Jira ticket ID (e.g.: QE-83414): _  (skip if item 4 is a Jira URL for this ticket)
 2. Feature name (snake_case): _
 3. Test scope: a) UI only  b) API only  c) Both
-4. PRD content (paste from Jira or Confluence): _
+4. Design Spec source: a) Jira URL/key  b) Confluence URL  c) pasted content: _
 5. QE Owner (your name): _
 6. (Optional) Test focus — areas to emphasize or deprioritize? (Enter to skip): _
+7. Confluence output: a) Publish live via MCP  b) Write locally as .md: _
+8. (Only if 7a) Space, parent page (optional), QE Epic Link (optional), Release Schedule (optional),
+   Dev Members (optional), Test Rail Link (optional), Testing Estimate (optional): _
 ```
 
-**User provides inputs → skill prints compact requirements summary → user confirms →
-skill builds test cases internally → runs silent coverage gap check + quality score (auto-fixes if < 75) →
-skill prints compact test list with tags + score → user confirms → skill reads KB index + targeted sections →
-mkdir -p smtp_testplan → writes CSV + Confluence .md → prints output summary.**
+**User provides inputs → if item 4 is a Jira/Confluence URL or key, skill fetches it via Atlassian MCP
+(resolves cloud ID, pulls issue/page content, follows a linked Confluence Design Spec if the Jira ticket points
+to one, prints a one-line confirmation of what it fetched) → user confirms the fetched content is right
+(or pastes manually if MCP fetch fails/unavailable) → skill prints compact requirements summary → user
+confirms → skill builds test cases internally → runs silent coverage gap check + quality score (auto-fixes
+if < 75) → skill prints compact test list with tags + score → user confirms → skill reads KB index +
+targeted sections → mkdir -p smtp_testplan → writes the TestRail CSV → builds the Confluence page content →
+either confirms space/parent and publishes live via `createConfluencePage`, or writes the local .md file →
+prints output summary with the page URL (if published) or file path.**

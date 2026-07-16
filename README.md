@@ -1,35 +1,43 @@
 # smtp-testplan-generator
 
-A Claude Code skill that generates complete, TestRail-ready test plans for SMTP Proxy features directly from a PRD.
+A Claude Code skill that generates complete, TestRail-ready test plans for SMTP Proxy features directly from a Design Spec.
 
 ## What it produces
 
-For each run it writes two files to `smtp_testplan/` inside your current working directory:
+Every run writes a TestRail CSV, plus a QE test-plan page in the team's real Confluence template — either published live or written locally, your choice:
 
-| File | Use |
+| Output | Use |
 |---|---|
-| `{TICKET_ID}_{feature_name}_testrail.csv` | Import directly into TestRail via "Import Test Cases → CSV" |
-| `{TICKET_ID}_{feature_name}_confluence.md` | Paste into your Confluence test plan page |
+| `smtp_testplan/{TICKET_ID}_{feature_name}_testrail.csv` | Import directly into TestRail via "Import Test Cases → CSV" |
+| Confluence page (matches the team's `ENG`-space QE test-plan format) | Either **published live** to a Confluence space via the Atlassian MCP connection, or written locally to `smtp_testplan/{TICKET_ID}_{feature_name}_confluence.md` for you to paste in yourself |
 
 ## How to invoke
 
 Type `/smtp-testplan-generator` in Claude Code. The skill will ask for:
 
-1. Jira ticket ID (e.g. `QE-83414`)
+1. Jira ticket ID (e.g. `QE-83414`) — can be skipped if item 4 is a Jira URL for the same ticket
 2. Feature name in snake_case (e.g. `machine_generated_email`)
 3. Test scope — UI only / API only / Both
-4. PRD content — paste from your Jira or Confluence page
-5. Your name (used as QE Owner in TestRail)
+4. Design Spec source — a Jira issue URL/key or a Confluence page URL (fetched automatically via the Atlassian MCP connection), or pasted content if you'd rather not use MCP
+5. Your name (used as QE Owner / QE Members in TestRail and Confluence)
+6. (Optional) Test focus — areas to emphasize or deprioritize
+7. Whether the Confluence output should be published live via MCP or written locally as a `.md` file
+8. If publishing live: the target Confluence space, plus optional metadata (parent page, QE Epic Link, Release Schedule, Dev Members, Test Rail Link, Testing Estimate)
 
-The skill walks you through three confirmation checkpoints before writing any files:
-- Requirements summary (Phase 1) — verify extraction from PRD
+If item 4 is a URL, the skill fetches the Design Spec directly — no copy-pasting needed. Jira tickets that link out to a Confluence design doc are detected and offered as an additional fetch. If the MCP fetch fails or isn't available, it falls back to asking you to paste the content.
+
+The skill walks you through several confirmation checkpoints before writing anything:
+- What it fetched (Phase 0.5) — confirm it grabbed the right Design Spec
+- Requirements summary (Phase 1) — verify extraction from Design Spec
 - Test case list (Phase 3) — add/remove/reprioritize before output
-- Output summary (Phase 4) — file paths + counts
+- Confluence space/parent (Phase 4, if publishing live) — confirm before creating a page in a shared space
+- Output summary (Phase 4) — file paths / page URL + counts
 
 ## Prerequisites
 
 - Claude Code CLI installed and authenticated
 - Invoke from any directory — the skill is installed globally at `~/.claude/skills/`
+- Atlassian MCP connection (optional but recommended) — needed to fetch Design Specs by URL/key and to publish the Confluence page live. Without it, fall back to pasting the Design Spec content and writing the Confluence output locally.
 
 ## Skill layout
 
@@ -53,8 +61,8 @@ Generated test plans go to `smtp_testplan/` inside your **current working direct
 
 ## Design principles
 
-- **PRD-only scope** — test cases come strictly from what the PRD states; nothing inferred
-- **Token-efficient** — KB index read first; only relevant sections loaded per PRD type
+- **Design Spec-only scope** — test cases come strictly from what the Design Spec states; nothing inferred
+- **Token-efficient** — KB index read first; only relevant sections loaded per Design Spec type
 - **Executable steps** — every step names exact Python methods, kubectl commands, or smtplib calls
 - **Placeholder variables** — no hardcoded IPs, tenant IDs, or pod names; all use `<PLACEHOLDER>` tokens from `testrail_format_reference.md`
 
@@ -84,7 +92,7 @@ The KB captures reusable test patterns. Update it when you encounter something n
 
 1. Add the section to the appropriate KB file (`smtp_proxy_kb_api.md` or `smtp_proxy_kb_ui.md`) with a numbered heading (e.g. `## 19. New Feature Pattern`)
 2. Add a row to `smtp_proxy_kb_index.md` Step 2 section guide mapping the feature area to the new section number
-3. Test it: invoke the skill with a PRD that would need the new section and verify the skill reads it
+3. Test it: invoke the skill with a Design Spec that would need the new section and verify the skill reads it
 
 ### How to update an existing pattern
 

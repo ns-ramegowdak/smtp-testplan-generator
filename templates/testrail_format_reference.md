@@ -19,7 +19,7 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 | 8 | Automated | Always `No` for new tests (not yet implemented) | Always: `No` |
 | 9 | UI Case | Always `No` for SMTP tests | Always: `No` |
 | 10 | QE Owner | Test owner name | Dynamic (user-provided, default: `Ramegowda K`) |
-| 11 | Suggested by Dev | Always `No` unless PRD specifies otherwise | Always: `No` |
+| 11 | Suggested by Dev | Always `No` unless Design Spec specifies otherwise | Always: `No` |
 | 12 | Result | Empty for new tests | Always: `` (empty) |
 | 13 | Label | Tag for source tracking | Always: `ai_generated` |
 
