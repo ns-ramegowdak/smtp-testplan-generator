@@ -183,6 +183,62 @@ Wait for confirmation, then proceed.
 
 ---
 
+## Phase 1.5 — Feature Impact Analysis
+
+Goal: use product-level knowledge of SMTP Proxy (not the test-mechanics KB in `kb/`) to work out
+where the new feature sits in the architecture and what existing features it could affect —
+so the Confluence "Dependency features and Regression Impact" section reflects real product
+context instead of falling back to "(not specified)", and so regression coverage can be added
+deliberately rather than left to chance.
+
+### 1.5.1 Read the product references
+
+Both files are small — read each in full, no targeted/offset reads needed here (unlike `kb/`):
+- `~/.claude/skills/smtp-testplan-generator/references/product_architecture.md`
+- `~/.claude/skills/smtp-testplan-generator/references/feature_matrix.md`
+
+### 1.5.2 Map the new feature onto the architecture
+
+From the Design Spec content and requirements map (§1.1), identify which architecture
+component(s) in `product_architecture.md` the new feature changes (e.g. MSA/relay config, RT
+policy engine, DLP scanning metadata/content path, header injection, a specific UI surface).
+
+If the feature doesn't clearly map to any documented component, say so plainly — do not force a
+match.
+
+### 1.5.3 Find interaction/regression candidates
+
+Using `feature_matrix.md`, find every existing feature row whose "Shares architecture with"
+column overlaps the component(s) from §1.5.2. Pull that row's "Regression risk if changed" note.
+
+Build:
+- `IMPACTED_FEATURES` — list of existing feature names with a one-line reason each
+- `REGRESSION_RISK_NOTES` — the specific risk statements pulled from the matrix
+
+### 1.5.4 Confirm with the user
+
+Print a compact summary:
+
+```
+Feature Impact Analysis — {FEATURE_NAME}
+Touches: {architecture component(s)}
+Related existing features: {feature name} — {one-line reason}, ...
+Regression risk notes: {risk statement}, ...
+```
+
+Ask: "Does this impact analysis look right — anything to add or correct? And should I generate
+`[REG]`-tagged regression test cases for the impacted areas above, or just note them in the
+Dependency/Regression Impact section for now?"
+
+Wait for confirmation. Record the answer as `GENERATE_REGRESSION_TESTS` = yes/no. If the user
+corrects the impacted-features list, use their corrected version for the rest of this run.
+
+**Note:** generating `[REG]` tests only when the user opts in here keeps Quality Rule 1
+(Design Spec-only scope) intact by default — regression coverage of existing features is an
+explicit, confirmed addition, not an inferred one.
+
+---
+
 ## Phase 2 — Test Design
 
 Apply ISTQB techniques to each requirement.
@@ -198,6 +254,7 @@ Apply ISTQB techniques to each requirement.
 | **Use Case Testing (UC)** | End-to-end happy-path flows from acceptance criteria | `[POS]` |
 | **Error Guessing (EG)** | Error conditions [E-N] | `[NEG]` |
 | **Error Guessing (EG)** | Security requirements [S-N] | `[SEC]` |
+| **Regression (REG)** | Existing features flagged in Phase 1.5 §1.5.3, only if `GENERATE_REGRESSION_TESTS = yes` | `[REG]` |
 
 ### 2.2 Priority Assignment Rules
 
@@ -232,8 +289,11 @@ Assign a category tag to each test based on the technique and outcome:
 - `[NEG]` — EG errors [E-N], EP invalid partition, DT/ST error rows
 - `[BND]` — any BVA test (at/below/above limit)
 - `[SEC]` — EG from security requirements [S-N]
+- `[REG]` — regression test on an existing feature flagged in Phase 1.5, only when
+  `GENERATE_REGRESSION_TESTS = yes`. Steps must verify the existing feature's documented
+  behavior is unchanged, not test the new feature itself.
 
-Prepend the tag to the test Summary: `[POS] Verify ...`, `[NEG] Verify ...`.
+Prepend the tag to the test Summary: `[POS] Verify ...`, `[NEG] Verify ...`, `[REG] Verify ...`.
 
 ---
 
@@ -270,9 +330,10 @@ TC-1  P0  Functional   [POS] Verify ...
 TC-2  P0  Security     [SEC] Verify ...
 TC-3  P1  Negative     [NEG] Verify ...
 TC-4  P1  Boundary     [BND] Verify ...
+TC-5  P2  Regression   [REG] Verify ...
 ...
 Total: N  |  Auto: X/N  |  P0: A  P1: B  P2: C
-Coverage: [POS]: A  [NEG]: B  [BND]: C  [SEC]: D
+Coverage: [POS]: A  [NEG]: B  [BND]: C  [SEC]: D  [REG]: E
 ```
 
 Ask: "Does this list look complete? Add, remove, or reprioritize anything?"
@@ -327,6 +388,7 @@ Rules:
 - Fixed columns: `Component=SMTP Proxy`, `Automated=No`, `UI Case=No`, `Result=`, `Label=ai_generated`
 - `Suggested by Dev=No` unless Design Spec explicitly attributes a test to a dev suggestion
 - `QE Owner={QE_OWNER}`
+- `[REG]`-tagged test cases (§2.4) use `Test Categories=Regression` in Column 1
 
 ### Step 3: Build the Confluence page content
 
@@ -351,10 +413,10 @@ Use `confluence_template.md` as the structural skeleton — this mirrors the tea
 | `{SETUP_DIAGRAM}` | Simple `A → B → C` text arrow diagram of the component flow, only if the Design Spec describes one; else `(not specified in Design Spec)` |
 | `{STACK_ACCESS_NOTES}` + `{TEST_REQUIREMENTS_TABLE_ROWS}` | Environment/stack requirements — reuse the placeholder variables from `testrail_format_reference.md` (VIP, namespace, tenant, etc.); mark availability `Yes` only if the KB confirms it, else leave blank |
 | `{FEATURE_FLAGS_TABLE_ROWS}` | One row per flag `[F-N]` from the requirements map: Type / Flag Name / Default Status. If no flags exist, one row: `NA \| NA \| —` |
-| `{DEPENDENCY_FEATURES_AND_REGRESSION_IMPACT}` | Combine: features this depends on (if the Design Spec states any, else `NA`) + regression impact statement (what existing behavior must stay unaffected — derive from Design Spec if stated, else `(not specified in Design Spec)`) |
+| `{DEPENDENCY_FEATURES_AND_REGRESSION_IMPACT}` | `IMPACTED_FEATURES` + `REGRESSION_RISK_NOTES` from Phase 1.5 (confirmed with the user), combined with anything the Design Spec itself states about dependencies. If Phase 1.5 found no clear mapping and the Design Spec states nothing, use `(not specified in Design Spec)` |
 | `{ACCEPTANCE_CRITERIA_BULLETS}` | Explicit acceptance criteria from the Design Spec. If none are stated verbatim, use the three standard bullets seen on both reference pages (build valid + deployed, dev unit tests done, QE test cases pass) and note in Open Questions that Design-Spec-specific ACs were not found |
 | `{RESILIENCY_SECTION}` | Only include when the Design Spec describes failure modes/edge cases worth calling out as "Potential Failures": render as `## Resiliency of Service/Feature\n\nPotential Failures :\n\n{bullets from [Q-N]/edge cases}`. Otherwise this placeholder resolves to an empty string (omit the whole section — do not print an empty heading) |
-| Test Cases table rows | Group test cases under `Section` header rows you choose to fit the feature (e.g. `Backend API`, `WebUI`, `E2E`, `Negative`, `Security` — the real pages use feature-specific section names, not a fixed list). Within each section, one row per test case: S.No (`TC-N`), Section, Test Categories(Type) = the `[POS]/[NEG]/[BND]/[SEC]` category, Service/Component, Test Summary, Steps, Expected Result, Priority, Automatable, `Automated=No`, `UI Case` (Yes only if it drives a UI page object), `Arrived by QE=No`, `Suggested by Dev` (same rule as the CSV), `Derived by AI=Yes` |
+| Test Cases table rows | Group test cases under `Section` header rows you choose to fit the feature (e.g. `Backend API`, `WebUI`, `E2E`, `Negative`, `Security` — the real pages use feature-specific section names, not a fixed list). Within each section, one row per test case: S.No (`TC-N`), Section, Test Categories(Type) = the `[POS]/[NEG]/[BND]/[SEC]/[REG]` category, Service/Component, Test Summary, Steps, Expected Result, Priority, Automatable, `Automated=No`, `UI Case` (Yes only if it drives a UI page object), `Arrived by QE=No`, `Suggested by Dev` (same rule as the CSV), `Derived by AI=Yes` |
 | `{DETAILED_TEST_CATEGORY_NOTES}` | One `###` subsection per Section used above, 2–4 bullets summarizing what that section validates (mirrors "WebUI Test" / "End to End Functional Test" / "Performance Test" subsections on the reference page) |
 | `{ACTIONABLE_ITEMS_CHECKLIST}` | One checkbox item per Open Question `[Q-N]`, plus the standard `- [ ] Feature Automation needed?` item |
 | `{TOI_LINKS}` | `To be Recorded.` |
@@ -424,14 +486,18 @@ Next steps:
 
 | File | Purpose |
 |---|---|
-| `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_index.md` | **Read first** — decision table for which KB file/sections to load, plus a line-number map for targeted offset/limit reads |
+| `~/.claude/skills/smtp-testplan-generator/references/product_architecture.md` | **Phase 1.5** — SMTP Proxy product architecture: data flow, MSA types, RT policy, DLP scanning, header injection, UI surfaces. Read in full — small, no targeted reads |
+| `~/.claude/skills/smtp-testplan-generator/references/feature_matrix.md` | **Phase 1.5** — existing feature list with dependencies/interaction candidates/regression risk, used to identify impact of the new feature. Read in full |
+| `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_index.md` | **Phase 4 — read first** — decision table for which KB file/sections to load, plus a line-number map for targeted offset/limit reads |
 | `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_ui.md` | UI layer KB: SMTP Settings page, Alerts/Events/Incidents patterns |
 | `~/.claude/skills/smtp-testplan-generator/kb/smtp_proxy_kb_api.md` | API/backend KB: smtplib, kubectl, feature flags, logs, relay config |
 | `~/.claude/skills/smtp-testplan-generator/templates/testrail_format_reference.md` | CSV column spec, placeholder vars, step/expected format rules |
 | `~/.claude/skills/smtp-testplan-generator/templates/confluence_template.md` | QE test-plan page skeleton, matching the team's real `ENG`-space pages |
 | `~/.claude/skills/smtp-testplan-generator/examples/` | Sample outputs for reference only — do NOT read at runtime |
 
-> Always read the KB index first. Never read example files at runtime.
+> `references/` (product knowledge — what the product does) is distinct from `kb/` (test mechanics
+> — how to write the test code). Read both `references/` files in full during Phase 1.5. Always
+> read the KB index first during Phase 4. Never read example files at runtime.
 
 ---
 
@@ -440,8 +506,11 @@ Next steps:
 ```
 ~/.claude/skills/smtp-testplan-generator/
 ├── SKILL.md                          ← this file
+├── references/
+│   ├── product_architecture.md       ← Phase 1.5: product architecture, read in full
+│   └── feature_matrix.md             ← Phase 1.5: existing features + regression risk, read in full
 ├── kb/
-│   ├── smtp_proxy_kb_index.md        ← read first every run
+│   ├── smtp_proxy_kb_index.md        ← Phase 4: read first every run
 │   ├── smtp_proxy_kb_api.md          ← API/backend patterns
 │   └── smtp_proxy_kb_ui.md           ← UI layer patterns
 ├── templates/
@@ -482,8 +551,12 @@ smtp-testplan-generator needs a few details:
 (resolves cloud ID, pulls issue/page content, follows a linked Confluence Design Spec if the Jira ticket points
 to one, prints a one-line confirmation of what it fetched) → user confirms the fetched content is right
 (or pastes manually if MCP fetch fails/unavailable) → skill prints compact requirements summary → user
-confirms → skill builds test cases internally → runs silent coverage gap check + quality score (auto-fixes
-if < 75) → skill prints compact test list with tags + score → user confirms → skill reads KB index +
-targeted sections → mkdir -p smtp_testplan → writes the TestRail CSV → builds the Confluence page content →
-either confirms space/parent and publishes live via `createConfluencePage`, or writes the local .md file →
-prints output summary with the page URL (if published) or file path.**
+confirms → skill reads `references/product_architecture.md` + `references/feature_matrix.md`, maps the
+feature onto the architecture, and finds impacted existing features + regression risks → user confirms
+the impact analysis and chooses whether to generate `[REG]` regression tests → skill builds test cases
+internally → runs silent coverage gap check + quality score (auto-fixes if < 75) → skill prints compact
+test list with tags + score → user confirms → skill reads KB index + targeted sections → mkdir -p
+smtp_testplan → writes the TestRail CSV → builds the Confluence page content (Dependency/Regression
+Impact section now grounded in the Phase 1.5 analysis) → either confirms space/parent and publishes live
+via `createConfluencePage`, or writes the local .md file → prints output summary with the page URL (if
+published) or file path.**

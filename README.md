@@ -29,6 +29,7 @@ If item 4 is a URL, the skill fetches the Design Spec directly — no copy-pasti
 The skill walks you through several confirmation checkpoints before writing anything:
 - What it fetched (Phase 0.5) — confirm it grabbed the right Design Spec
 - Requirements summary (Phase 1) — verify extraction from Design Spec
+- Feature impact analysis (Phase 1.5) — confirm which existing features/architecture areas the new feature touches, and whether to generate regression test cases for them
 - Test case list (Phase 3) — add/remove/reprioritize before output
 - Confluence space/parent (Phase 4, if publishing live) — confirm before creating a page in a shared space
 - Output summary (Phase 4) — file paths / page URL + counts
@@ -45,6 +46,9 @@ The skill walks you through several confirmation checkpoints before writing anyt
 ~/.claude/skills/smtp-testplan-generator/
 ├── SKILL.md               ← skill definition (loaded by Claude Code)
 ├── README.md              ← this file
+├── references/
+│   ├── product_architecture.md   ← product knowledge: data flow, MSA types, RT policy, DLP scanning, UI surfaces
+│   └── feature_matrix.md         ← existing features + their dependencies/regression risk, used for Phase 1.5 impact analysis
 ├── kb/
 │   ├── smtp_proxy_kb_index.md    ← read first every run (routing table)
 │   ├── smtp_proxy_kb_api.md      ← API/backend patterns (smtplib, kubectl, logs)
@@ -61,14 +65,49 @@ Generated test plans go to `smtp_testplan/` inside your **current working direct
 
 ## Design principles
 
-- **Design Spec-only scope** — test cases come strictly from what the Design Spec states; nothing inferred
+- **Design Spec-only scope** — test cases come strictly from what the Design Spec states; nothing inferred, except regression tests the user explicitly opts into via Phase 1.5
+- **Product-aware impact analysis** — Phase 1.5 reasons about where a new feature sits in the SMTP Proxy architecture and what existing features it could affect, using `references/`, before test design begins
 - **Token-efficient** — KB index read first; only relevant sections loaded per Design Spec type
 - **Executable steps** — every step names exact Python methods, kubectl commands, or smtplib calls
 - **Placeholder variables** — no hardcoded IPs, tenant IDs, or pod names; all use `<PLACEHOLDER>` tokens from `testrail_format_reference.md`
 
 ---
 
-## How to update the KB
+## Two knowledge layers — `references/` vs `kb/`
+
+- **`references/`** — product knowledge: what SMTP Proxy *is*, its architecture, and how existing
+  features relate to and could be affected by a new one. Read in full during Phase 1.5 (small
+  files, no targeted reads needed). This is what makes the impact analysis possible.
+- **`kb/`** — test-writing mechanics: exact Selenium page objects, smtplib calls, kubectl commands,
+  log formats. Read via targeted/offset reads during Phase 4, per the KB index's line-number map.
+
+Don't mix these up when updating: a new SMTP header's *meaning* goes in `references/`; the exact
+Python call to send/assert it goes in `kb/`.
+
+## Where this content was sourced from
+
+- `references/` and `kb/` were built/refreshed from: `docs.netskope.com/en/netskope-smtp-proxy`
+  (public docs), the team's real TestRail suite (`SMTP Proxy`, S926), and the actual automation
+  code at `nsproxy/tests/api/SMTP/smtp_proxy/` and `nsproxy/tests/ui/SMTP/` (in the
+  `nsproxy-tests` PyCharm project).
+- The UI test tree (`nsproxy/tests/ui/`) contains many other products' test folders — when
+  refreshing from code again, scope strictly to the `SMTP/` subfolder and
+  `data/Feature_SMTP_Proxy/`, not the whole `ui/` tree.
+- Code is ground truth for exact header names, endpoints, ports, and config paths — prefer it over
+  docs or TestRail titles when they conflict, and update `references/`/`kb/` accordingly.
+
+## How to update `references/` (product knowledge)
+
+| You learned... | Update this file |
+|---|---|
+| A new architecture component, data-flow step, MSA type, or UI surface | `references/product_architecture.md` |
+| A new existing feature, or a new dependency/interaction between existing features | `references/feature_matrix.md` |
+| That a just-generated feature could itself become a future regression candidate | Add a row for it to `references/feature_matrix.md` once its test plan is done — this is how the impact analysis stays current over time, per the note at the bottom of that file |
+
+Keep `references/` scoped to product behavior, not test code — no Python/Selenium/kubectl in these
+files; that belongs in `kb/`.
+
+## How to update the KB (test mechanics)
 
 The KB captures reusable test patterns. Update it when you encounter something new that will apply to future features — not feature-specific details (those belong only in the generated test plan).
 

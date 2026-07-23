@@ -1,6 +1,6 @@
 # SMTP Proxy KB — UI Layer
 
-Sections: SMTP Settings Page, Alerts/Events/Incidents Page Patterns
+Sections: SMTP Settings Page, Alerts/Events/Incidents Page Patterns, Additional Page Objects & UI Test Areas (Tenant ID, Domain Validation, Self-Addressed, Machine-Generated, combined scenarios, Settings page migration state)
 For API/backend patterns → see smtp_proxy_kb_api.md
 
 ---
@@ -185,6 +185,11 @@ provisioner.client_config_flag(feature_name="inline_policy_enhancements_enabled"
 # smtp_use_secondary_next_hop / enable_on_prem_msa: no-ops since R122/R123
 ```
 
+**⚠ Possibly stale:** newer test classes (§23) parametrize explicitly on `enable_on_prem` (0/1)
+crossed with the `nplan6151` (Tenant ID via custom headers) flag, which implies `enable_on_prem_msa`
+is *not* purely a no-op in the current build. Re-verify against the live app before relying on the
+"no-op since R122/R123" claim for any new test.
+
 ### 17.13 UI Input Data Files
 
 ```python
@@ -328,3 +333,70 @@ def get_side_panel_field_value(driver, field_label):
 assert get_side_panel_field_value(driver, "Machine Email Detected") == "Yes"
 assert get_side_panel_field_value(driver, "Machine Email Confidence") is None  # field absent
 ```
+
+---
+
+## 23. Additional Page Objects & UI Test Areas (from live SMTP UI test folder)
+
+Confirmed page objects beyond §17/§18, scoped strictly to `nsproxy/tests/ui/SMTP/` (the UI test
+tree also contains dozens of unrelated-product folders — don't pull page objects from outside this
+path for SMTP work):
+
+```python
+from webui_libs.pages.real_time_protection.real_time_policy_wrapper import RtProtectionPolicyWrapper
+from webui_libs.pages.real_time_protection.real_time_protection_policy_page import (...)
+from webui_libs.pages.SkopeIT_page_event import SkopeIT_Page_Event
+from webui_libs.pages.email_notification_template import EmailNotificationPage
+from webui_libs.pages.policies.profiles.constraint.users_profiles import (...)   # Constraint Profile page
+from webui_libs.pages.incidents.incidents_dlp import NSIncidentsDLPPage          # already in §18
+```
+
+### 23.1 Custom Tenant Identification settings page (NPLAN-6151 WebUI)
+
+Real test classes (`test_settings_smtp2.py`, `test_settings_smtp3.py`) parametrize this page along
+three independent axes — combine all three when testing a change here, not just one:
+
+- `enable_on_prem` (0/1) — On-Prem MSA enabled/disabled
+- `nplan6151` (0/1) — Tenant Identification via custom headers flag
+- Secondary next-hop configured or not
+
+Class names to search for as a starting point: `TestSMTPProxySettingsPage_CustomTenantIdentification`,
+`..._disable_onPremMSA`, `..._SecondaryHop`, `..._Disabled`.
+
+### 23.2 DNS Domain Validation UI (two generations)
+
+Two parallel test suites exist for domain validation UI — a "classic" flow and a newer "NGWEB"
+flow (`test_domain_validation_classic_webui_cases.py`'s `TestSMTPProxy_DNSDomainValidation_classic`
+vs. `test_ngweb_new_domain_validation.py`'s `TestNGWEBNewDomainValidation`). A domain-validation UI
+change must be checked against both — don't assume the classic flow was removed just because a
+newer one exists.
+
+### 23.3 Self-Addressed Email on the Incidents page
+
+`test_self_addressed_email_incidents_page.py` → `TestIncidentPageSelfAddressedEmail` — verifies
+the self-addressed-email value/field specifically on the DLP Incidents page (`NSIncidentsDLPPage`),
+distinct from the Alerts/Events SkopeIT filter coverage already in §18.7/§18.9.
+
+### 23.4 Machine-Generated Email in SkopeIT
+
+`test_skopeit_machine_generated_email.py` → `TestSkopeITMachineGeneratedEmail` — UI-side coverage
+for the BOT-score feature (see `../references/feature_matrix.md` row 25 and
+`smtp_proxy_kb_api.md` §21 for the backend/config side).
+
+### 23.5 RTP Balkan combined-scenario suite
+
+`rtp_balkan.py` (~1,300 lines, ~28 test functions) is a large combined-regression UI suite covering
+RTP page access, MSA edit windows, Record Subject Line, DLP-flag interplay, Secondary Next Hop,
+Custom MSA CRUD, and Tenant Identification (+ variants) together. Treat this as the UI equivalent
+of `references/feature_matrix.md` row 34 (End-to-End / Solution-Level Scenarios) — a good place to
+look for how a new feature might need a combined-scenario UI regression case, not just a unit one.
+
+### 23.6 SMTP Settings page — old modal vs new modal
+
+Confirmed in `test_settings_smtp.py`: `TestSMTPProxySettingsPageOldModal` and
+`TestSMTPProxySettingsPageSecondaryNexthopNewModal` both exist and are both actively tested — the
+settings page is mid-migration for at least secondary-next-hop configuration. A UI change here must
+be verified against both modal versions; see `../references/product_architecture.md` "known
+gotchas" for the same note. `TestCustomMSALimit` confirms the 3-custom-MSA limit is enforced at the
+UI layer too, not just the backend DNS-validation layer (`smtp_proxy_kb_api.md` §18's domain
+validation note).
