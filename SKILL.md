@@ -765,7 +765,13 @@ Next steps:
    plan that only exercises the documented happy path has not satisfied this rule.
 10. **Keep the KB current** — Every run that reads a Design Spec is also a chance to capture product
     knowledge this skill didn't have before. See Phase 4.5 — this runs automatically, not on request.
-11. **The Confluence page must be human-readable, not just correctly-structured** — a table with the
+11. **No Dev/SRE handoffs in Manual Execution Steps** — this team has no separate Dev/SRE to hand
+    execution off to; the QE runs every test themselves. Never write a manual step as "ask/confirm
+    with Dev/SRE" (or similar). Backend/pod-level actions (checking or restoring a feature flag,
+    removing a test RT policy, pulling a pcap, etc.) get written as a direct QE action using the
+    access/tooling the KB documents (`kubectl exec`, the feature-flag API, the relay-config API) —
+    see the Manual Execution Steps rules in `testrail_format_reference.md`.
+12. **The Confluence page must be human-readable, not just correctly-structured** — a table with the
     right columns and content is still a failure if it renders unreadably (e.g. the 15-column Test
     Cases table squeezed into one-character-per-line wraps in the narrow default Confluence layout —
     this happened for real). Publish mode always builds the body as HTML with `data-layout="full-width"`

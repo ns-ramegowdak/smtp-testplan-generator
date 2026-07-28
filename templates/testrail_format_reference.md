@@ -113,8 +113,15 @@ MANUAL STEPS:
   instruction a first-time reader can follow without prior context
 - Always include at least one `Observe:` step and one `Confirm:` step tied to the Expected Result
 - Include a plain-language `Restore:`/cleanup step last
-- If the underlying action genuinely can't be done by hand (e.g. tcpdump packet inspection), say so
-  plainly rather than omitting the step: `4. Ask a Dev/SRE to pull the pcap on <SMTP_PROXY_POD> and confirm <condition>`
+- **Never delegate a step to "Dev/SRE" or any other handoff** — this team has no separate Dev/SRE to
+  hand off to; the QE running the test performs every step themselves. If the underlying action needs
+  backend/pod access (tcpdump, config file checks, feature-flag state, kubectl exec), write it as a
+  direct QE action using the access/tooling the KB documents (e.g. `kubectl exec` into
+  `<SMTP_PROXY_POD>`, the feature-flag API, the relay-config API) rather than saying "ask" or "confirm
+  with" anyone else:
+  `4. Run kubectl exec -it <SMTP_PROXY_POD> -n <SMTP_PROXY_NS> -- tcpdump -i any port 25 -w /tmp/capture.pcap, then copy the file off the pod and inspect it and confirm <condition>`
+  If genuinely no QE-accessible method exists for an action (rare), say so plainly as an Open Question
+  rather than writing an unowned "ask someone" step.
 
 ---
 
