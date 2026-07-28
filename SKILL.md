@@ -634,10 +634,18 @@ Do NOT invent content for any section — if a section has no Design Spec basis,
 
 ### Step 4: Deliver the Confluence content — Publish or Local
 
+**Human-readability requirement (both modes):** the Test Cases table has 15 columns. Confluence's
+default table width is the narrow center content column — a table this wide, published as plain
+markdown, gets squeezed into one-character-per-line column wraps that nobody can actually read (this
+happened for real; the fix below is the confirmed remedy, not a theoretical concern).
+
 **If `CONFLUENCE_OUTPUT_MODE = Local`:**
 - Write the filled-in content to `smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_confluence.md` — or, matching
   the CSV filename rule in Step 2, `..._phase2_confluence.md` if `PHASE_MODE = Phase2` and the plain name
   would collide with the existing Phase 1 file.
+- Add a one-line note near the Test Cases table in the `.md` file: after pasting into Confluence, widen
+  the Test Cases table to "Full width" via the table's layout control in the Confluence editor toolbar —
+  otherwise it renders unreadably narrow.
 
 **If `CONFLUENCE_OUTPUT_MODE = Publish`:**
 1. Resolve `cloudId` — reuse the one resolved in Phase 0.5 if this run already fetched from Atlassian MCP; otherwise resolve it now the same way (site hostname first, `mcp__atlassian__getAccessibleAtlassianResources` as fallback).
@@ -650,9 +658,22 @@ Do NOT invent content for any section — if a section has no Design Spec basis,
    Proceed? (y/n)
    ```
    Wait for explicit confirmation. If the user declines, fall back to Local mode instead (write the file) rather than dropping the output.
-3. On confirmation, call `mcp__atlassian__createConfluencePage` with `cloudId`, `spaceId = CONFLUENCE_SPACE`, `parentId = CONFLUENCE_PARENT_ID` (omit if empty), `title = "{TICKET_ID} {FEATURE_TITLE}"`, `body` = the filled-in content, `contentFormat = "markdown"`.
-4. If the call fails for any reason (bad space key, permission denied, MCP unavailable), tell the user plainly what failed and fall back to writing the local `.md` file instead so the work isn't lost. Do not retry the same failing call more than once.
-5. On success, note the returned page URL for the final output summary.
+3. Build the body as **HTML**, not markdown (`contentFormat: "html"`) — this is what lets the Test Cases
+   table carry `<table data-layout="full-width">` so it actually uses the page's full width instead of
+   the narrow default column. Any other table with more than ~4 columns or long cell content (e.g. the
+   "In test scope / Not in test scope" table, the "Already Covered by Phase 1" traceability table) should
+   get `data-layout="wide"`. Tables with 2–3 short columns (header info, Feature Flags) can stay
+   `data-layout="default"`. Translate the confluence_template.md structure into standard HTML
+   (`<table>/<tr>/<th>/<td>`, `<h2>/<h3>`, `<ul>/<li>`, `<code>`, `<a href>`) — see the `createConfluencePage`/`updateConfluencePage` tool description for the exact HTML+ syntax (task lists for Actionable Items, etc.).
+4. Call `mcp__atlassian__createConfluencePage` with `cloudId`, `spaceId = CONFLUENCE_SPACE`, `parentId = CONFLUENCE_PARENT_ID` (omit if empty), `title = "{TICKET_ID} {FEATURE_TITLE}"`, `body` = the HTML content, `contentFormat = "html"`.
+5. If the call fails for any reason (bad space key, permission denied, MCP unavailable), tell the user plainly what failed and fall back to writing the local `.md` file instead so the work isn't lost. Do not retry the same failing call more than once.
+6. **Verify the table layout actually took effect** — `getConfluencePage` does not reliably echo the
+   `data-layout` attribute back in its response, so re-fetching the page is not sufficient
+   verification. If Chrome browser tools are available, navigate to the published page and screenshot
+   it to visually confirm the Test Cases table is readable (wrapped normal-width columns, not
+   one-character-per-line). If browser tools aren't available, say so plainly rather than silently
+   assuming the layout applied.
+7. On success, note the returned page URL for the final output summary.
 
 ### Step 4.5: Update the Knowledge Base (runs automatically, every run)
 
@@ -744,6 +765,12 @@ Next steps:
    plan that only exercises the documented happy path has not satisfied this rule.
 10. **Keep the KB current** — Every run that reads a Design Spec is also a chance to capture product
     knowledge this skill didn't have before. See Phase 4.5 — this runs automatically, not on request.
+11. **The Confluence page must be human-readable, not just correctly-structured** — a table with the
+    right columns and content is still a failure if it renders unreadably (e.g. the 15-column Test
+    Cases table squeezed into one-character-per-line wraps in the narrow default Confluence layout —
+    this happened for real). Publish mode always builds the body as HTML with `data-layout="full-width"`
+    on wide tables (see Phase 4 Step 4) and visually confirms it via a browser screenshot when that
+    tool is available — don't consider the page done just because the API call succeeded.
 
 ---
 
