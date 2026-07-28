@@ -3,6 +3,11 @@
 Source: docs.netskope.com/en/netskope-smtp-proxy and its sub-pages, cross-checked and extended
 against the real automation code in `nsproxy/tests/api/SMTP/smtp_proxy` and `nsproxy/tests/ui/SMTP`
 (the code confirmed real header names, ports, and endpoints where the docs were silent or vague).
+Also cross-checked (2026-07-28) against the team's internal Confluence space (`SMTPDLP`,
+https://netskope.atlassian.net/wiki/spaces/SMTPDLP) — specifically the Design Spec pages and
+"Known Limitations in the SMTP Proxy and MTAs" — for detail the public docs and test suite don't
+capture (e.g. the configurable loop-prevention header name, client-certificate back-connection
+support, and vendor-specific quirks in the "Known architectural gotchas" section below).
 Use this together with `feature_matrix.md` in Phase 1.5 to reason about where a new feature sits
 in the product and what it touches. For test-writing mechanics (page objects, smtplib patterns,
 log formats) see `../kb/` instead — this file is about the product, not test code.
@@ -131,6 +136,36 @@ confirms ownership. This enforces domain **uniqueness** across a tenant's MSAs a
 "max 3 custom MSAs per tenant" limit is also enforced (a 4th custom MSA's domain-verification
 request itself fails, not just UI creation).
 
+### Client certificates on the back connection (mTLS) — NPLAN-6880
+
+In addition to plain TLS (see "TLS version interoperability" in `feature_matrix.md` row 27),
+SMTP Proxy supports presenting a **client certificate** on the back connection to a customer's
+next-hop MTA, as an alternative/complement to IP allow-listing (some MTAs, e.g. O365, only accept
+inbound connections from allow-listed CIDRs or via mutual TLS). Configured per backend entry in
+`smtpSettings.json` under a `client-cert` block (`enabled`, `type`, and for BYOK a `cert-id`) —
+independent backends in the same tenant can each have their own cert config (or none).
+
+Two certificate models, selected by the tenant admin per backend:
+
+| Model | `type` value | How the cert is obtained |
+|---|---|---|
+| Netskope CA | `netskope-ca` | Netskope auto-generates and rotates an ephemeral leaf cert (15-day validity) chained to a per-tenant ephemeral CA (45-day validity, auto-renewed at T-3 days) signed by the Netskope Tenant CA. Customer only needs to download and trust the Netskope CA cert in their MTA — no manual cert upload. |
+| BYOK (public-CA-signed) | `byok` | Customer generates a CSR via the WebUI, submits it to their own public CA (DigiCert, GlobalSign, etc.), then uploads the signed cert + chain back through the WebUI. Required for MTAs (e.g. O365) that only trust public-CA-signed client certs. Cert material is fetched at runtime from Vault via the `CertBroker` framework and cached in memory per tenant; multiple active certs can coexist and are referenced by `cert-id`, letting an admin rotate/switch certs on a backend by changing `cert-id` alone, without a config-format change. |
+
+**Test implications:**
+- A given backend can have `client-cert` disabled, `netskope-ca`, or `byok` — these are independent
+  per-backend settings, not a single tenant-wide switch (same shape as Multiple Next Hop's
+  per-domain/shared config — see `feature_matrix.md` row 9).
+- If certificate retrieval fails (Vault/sidecar unreachable, invalid `cert-id`), the back connection
+  is expected to fail gracefully with a temporary (4xx) rejection, not drop the message or crash —
+  consistent with the proxy's general no-email-loss/retry philosophy (see "Known Limitations" notes
+  below on soft-error/retry behavior).
+- Switching a backend's `cert-id` (BYOK rotation) must not require restarting other, unrelated
+  backends' connections.
+- This is a distinct mechanism from the IP-allow-list model (Custom MSA source IP allow list,
+  `feature_matrix.md` row 10) — a Design Spec that mentions "client certificates" or "mTLS to next
+  hop" is this feature, not the IP allow list.
+
 ## Real-time Protection (RT) policy for Email Outbound
 
 Configured at Policies > Real-time Protection > new Email Outbound policy.
@@ -224,6 +259,15 @@ Two distinct kinds of header get added, on two different triggers:
    the customer's own MTA/Gmail/Exchange rule must be configured to skip re-routing a message back
    through the proxy when this header is already present. Both the Gmail and Exchange configuration
    guides call this out as a required exception rule.
+   - **The header name itself is configurable per backend config entry** via a `processed-header-name`
+     attribute on that entry in `smtpSettings.json` (e.g. a tenant can rename it to `x-custom-1` for
+     one app/domain and `x-custom-2` for another). The **value** stays `true` regardless of the
+     configured name — only the name changes. Default depends on tenant history: existing tenants
+     default to `x-netskope-inspected`, tenants with no prior SMTP settings default to
+     `x-netskope-processed`. WebUI validation restricts allowed characters, enforces a length limit,
+     and must reject any name that collides with an existing well-known header. **Test implication:**
+     don't hardcode `x-netskope-inspected` as the loop-prevention header name in generated tests —
+     confirm against the tenant's configured `processed-header-name` (or its default) instead.
 2. **Customer-defined header(s) — only when Action = "Add SMTP Header".** These are added in
    addition to `x-netskope-inspected`, and only fire when the matching RT policy's action is
    specifically "Add SMTP Header" (not Allow/Alert/Remove Recipients/Add Traffic Action). The
@@ -317,6 +361,13 @@ deployment, requiring a config push **and** a pod restart to take effect.
   Subject Line's sender constraint, or Remove Recipients' "To user" constraint) — any feature that
   introduces a new constraint-profile reference point must add this same delete-guard, or it's a
   regression against existing behavior.
+- **Upcoming: "From User" sender-constraint policy criterion (NPLAN-8098, Draft spec as of
+  2026-07-24)** — a sender-side mirror of the existing "To User" constraint, reusing the same
+  constraint-profile store/matching engine. The one requirement already locked in the spec: it must
+  match the SMTP **envelope sender** (`MAIL FROM`), never the message-header `From` — if a Design
+  Spec for this lands, this is the one explicit negative/positive case to insist on (there was a
+  latent code path that read the wrong field, per the spec's own findings). Treat everything else in
+  the spec as provisional until it moves past Draft.
 - **"Remove Recipients" and "Delete Recipients"** are the same action referred to by two names
   across sources (public docs say "Remove Recipients", the internal test suite says "Delete
   Recipients action" / feature flag `smtp_remove_recipients_enabled`) — treat them as one feature;
@@ -330,3 +381,36 @@ deployment, requiring a config push **and** a pod restart to take effect.
   API described above — a dedicated "Custom Tenant Identification" settings page exists with its
   own secondary-next-hop and disable/enable variants. A backend-only view of this feature misses
   real UI surface area.
+- **The proxy is a true pass-through, not a store-and-forward device.** If the next hop returns a
+  4XX "soft error" or the proxy can't open a connection at all, that error (or a `421 Network error`
+  / TCP FIN for a failed connect) is forwarded to the upstream sender as-is — the proxy does not
+  queue and retry internally. Seeing 421s/soft-errors in a customer's Exchange/Gmail send log is
+  expected behavior, not a proxy defect; don't generate a test asserting the proxy itself retries.
+- **`550 User Unknown` from the next hop on `RCPT TO` is not yet supported** (ENG-223381) — the
+  proxy currently stops processing and errors out rather than handling it gracefully. Treat this as
+  a known gap, not a target for a passing regression test, unless a Design Spec explicitly addresses it.
+- **Exchange Online + OneDrive attachment links bypass DLP.** If a sender attaches a file via
+  "upload to OneDrive + insert link" instead of a native attachment, the proxy never sees the file
+  content — DLP scanning is skipped for that attachment. (Mitigation is enabling OneDrive
+  Introspection separately, outside SMTP Proxy's own pipeline.)
+- **Gmail silently splits multi-recipient email into one message per recipient** before it reaches
+  the proxy. Effects: (a) one Application Event/DLP Event/Alert per recipient instead of one event
+  for the whole recipient list, and (b) a `to_user`/"To User" **Constraint Profile match/does-not-match
+  decision is evaluated per-recipient**, not as an OR (`matches`) / AND (`does not match`) over the
+  full original recipient list the way it would for a single multi-recipient send via another MSA.
+  A test that assumes one event per send, or list-level constraint semantics, will be wrong for
+  Gmail specifically.
+- **Gmail loopback quarantine must use "Reject message", never "Quarantine message"** in the
+  Content Compliance rule that matches the loop-prevention header. "Quarantine" causes a released
+  (Allow) email to re-enter the SMTP Proxy and get flagged again, in a loop that never delivers to
+  the recipient.
+- **Gmail "dynamic email"** (e.g. a Drive share-access request) can arrive with `MAIL FROM` set to
+  the `google.com` domain. Since `google.com` is virtually never a configured tenant domain, the
+  existing "mail from an unconfigured domain is rejected" rule (see MSA types above) silently drops
+  it — not a bug in the rejection rule, but a real, reported customer-visible gap specific to this
+  Gmail feature.
+- **Gmail Relay (`smtp-relay.gmail.com`) as next hop, in loopback mode, has known vendor-side
+  limits**, not proxy bugs: materially lower throughput than primary Gmail, observed throttling
+  around 250 emails/min per egress source IP (produces frequent `421` soft errors and TCP resets),
+  and any existing email footer gets duplicated (ENG-199485). Don't flag these as proxy regressions
+  when testing against the Gmail Relay next hop specifically.

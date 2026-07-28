@@ -116,13 +116,16 @@ ns_settings_page.allow_ip_element_n_input(i + 1).enter_text("1.2.3.4/24")
 ns_settings_page.custom_msa_save_btn.click()
 ```
 
-ipset verification (container: `smtp-pyipfirewall`, ~10s propagation):
+ipset verification (container: `smtp-pyipfirewall`, ~10s propagation; ipset name is `smtp_allowed`):
 ```python
-ipset_output = k8s_ops.exec_pod_shell_commands(pods[0], "smtp-pyipfirewall", "ipset -L")
+ipset_output = k8s_ops.exec_pod_shell_commands(pods[0], "smtp-pyipfirewall", "ipset list smtp_allowed")
 network = ipaddress.ip_network("1.2.3.4/24", strict=False)
 expected = str(network.network_address) if network.prefixlen == 32 else str(network)
 assert expected in set(ipset_output.splitlines())
 ```
+Full regression check per the team's own QE runbook: the added IP must also appear in
+`/opt/ns/smtpproxy/cfg/tenant-<tenant_id>.json` on the `smtp-pyipfirewall` container, the container
+must not restart/crash while applying the change, and its logs must show no ERROR/CRITICAL entries.
 
 ### 17.8 Domain Validation Rules (UI)
 

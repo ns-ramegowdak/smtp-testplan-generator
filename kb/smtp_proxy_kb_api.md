@@ -107,7 +107,14 @@ else:
 
 ### 3.3 Staged Config Flags
 
-**File:** `/opt/ns/cfg/staged_config_smtp.json`
+**File:** `/opt/ns/cfg/staged_config_smtp.json` — a single global (not per-tenant) JSON file applied
+to every tenant. **The proxy halts at startup and waits for this file if it's missing** — an
+explicit invariant worth a dedicated negative test if a Design Spec touches staged-config loading.
+Zero-downtime: changes apply at runtime, no process restart required. Source of truth is the
+`infrastructure` repo (`automation/playbooks/roles/cf_staged_config/files/staged_config_smtp.json`);
+pushed live via `curl -X PUT --data-binary @staged_config_smtp.json
+http://cfgpushervip:8887/file/opt/ns/cfg/staged_config_smtp.json`.
+
 ```python
 update_smtp_staged_config(k8s_operations, feature_flag_name, payload=None, status=True)
 ```
@@ -120,6 +127,22 @@ Known entries:
 
 {"name": "smtpproxy-header-settings", "data": {"preserve-header-whitespace": True/False}, "apply-globally": True}
 ```
+
+Full settings surface (parent/child feature → what it gates):
+
+| Parent | Child | Gates |
+|---|---|---|
+| `disallowed-domains` | `block-wildcard-config-match` | `MAIL FROM` domains disallowed for wildcard matching against a configured domain |
+| `disallowed-domains` | `well-known-public-domains` | Used by the self-addressed-email-similarity feature |
+| `disallowed-domains` | `next-hop-domain-block` | Blocks `MAIL FROM` from these shared domains |
+| `empty-mailfrom-handling` | — | Which next-hop hosts get an empty `MAIL FROM` populated from the `From` header instead |
+| `ehlo-hostname` | — | The EHLO hostname presented to the next hop |
+| `policy-files-selective-load` | — | Limits policy-module file loading to only what SMTP Proxy needs |
+| `subject-decode` | — | Enables non-ASCII subject decoding |
+| `generate-dem-metrics` | — | Enables the DEM feature (row 30) |
+| `dns-settings` | — | Adds extra DNS servers |
+| `systemconfig.halt-file-creation` | — | Read-only mode (no file creation) |
+| `systemconfig.tenant-match-by-header` | — | Enables custom-header tenant identification (row 12) — still needs the WebUI-side toggle too |
 
 ### 3.4 DKIM Feature Flag (nswatson.sh)
 
@@ -510,6 +533,24 @@ pop3.close()
 o365 = O365EmailClient(tenant_id, client_id, client_secret, resource_user)
 o365.send_email(**kwargs)
 ```
+
+### 17.1 Async DLP phases, error codes, and Prism metrics
+
+The Async DLP module has 4 phases — Init (encrypt/upload) → Scan Handler (`POST
+/v1/inspections/jobs`) → Result Handler (Redis notification) → Incident Generator (`POST
+/v1/eventgen/events`) — each with its own phase-prefixed status string (`Init*`/`Scan*`/`Result*`/
+`Incident*`) usable as a concrete pass/fail assertion instead of only checking end-user behavior:
+
+| Phase | Success status | Prism counter | Notes |
+|---|---|---|---|
+| Scan Handler | `ScanAccepted` (202) | `ns.service.async_dlp.scan_handler.request.count` | `status_code=409` + `ScanKeyRotated` is also a valid non-error outcome (key rotation) |
+| Result Handler | `ResultSuccess` | `ns.service.async_dlp.request.count` (module-level) | Timeout → `ResultDlpTimeout`; DLP-side error → `ResultDlpError` |
+| Incident Generator | `IncidentSuccess` (200) | `ns.service.async_dlp.incident.gen.count` | **Fire-and-forget — does not affect module-level status.** A run can report `ResultSuccess` at module level even if incident generation itself failed; check this counter separately, don't infer it from the module-level metric |
+
+**Test implication:** a fallback/error-injection test (blocking scan-handler/redis/event-generator per
+the utilities above) should assert on the specific phase's status string and Prism counter, not just
+"email was delivered/blocked" — this pinpoints which phase actually failed and avoids false passes
+where incident generation silently fails while the mail flow itself succeeds.
 
 ## 18. Outlook Plugin REST API Testing Pattern
 
