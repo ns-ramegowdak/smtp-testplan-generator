@@ -56,6 +56,17 @@ its boundary, its error path, and its interaction with what else is running, not
 test cases for behaviors, configurations, or edge cases not described in the Design Spec. If a behavior
 seems implied but is not stated, call it out in Section 9 (Open Questions) instead.
 
+**This extends to naming, not just behavior.** Never invent a plausible-sounding flag name, field name,
+API endpoint, config key, schema example, or Design Spec section number (`§2.2`, `§3.1.2.1`, etc.) that
+is not literally present in the fetched/pasted source text — this has happened for real: a two-sentence
+Jira ticket with no comments or linked docs produced a test plan citing specific flag names, a staged
+config gate, an OpenAPI schema example, and four numbered spec sections, none of which existed anywhere
+in the actual source. A thin Design Spec must produce a thin test plan (behavior-level tests only, plus
+a longer Open Questions list) — it never licenses filling the gap with invented implementation detail.
+If a test case would need to name something the source doesn't literally name, write
+`<not specified in Design Spec>` and raise it as an Open Question instead. See §0.5.3's content
+sufficiency check.
+
 **Reconciling the two:** "Design Spec-only scope" bounds *what feature surface* gets tested — don't
 test a behavior the Design Spec never describes. It does not bound *how hard* the described surface
 gets tested. Boundary values, malformed/adversarial input, error/timeout/failure paths, feature-flag
@@ -180,6 +191,14 @@ If `DESIGN_SPEC_INPUT` was a bare Jira key with no URL (no hostname to try), cal
 
 ### 0.5.3 Confirm before analyzing
 
+**Content sufficiency check (run first, silently):** Design Specs for this team range from a full
+technical doc (named fields/flags, API endpoints, numbered sections) down to a two-line customer-request
+narrative with no technical detail at all. Check which kind this is: does the fetched content state any
+concrete implementation specifics — named fields/flags/parameters, API endpoints, config keys, response
+codes, or a numbered section structure? If not, it is narrative-only, and no such specifics exist to
+extract — full stop. Do not reach for a plausible-sounding name to fill the gap (see the Core constraint
+above for why this matters).
+
 Print a compact confirmation — not the full fetched body:
 
 ```
@@ -187,7 +206,17 @@ Fetched Design Spec source:
   {Jira NPLAN-4895: "<issue summary>"} or {Confluence: "<page title>"}
   Content length: ~N words
   {If a linked Confluence Design Spec was also pulled in, name it here too}
+  {If narrative-only per the sufficiency check: "⚠ Narrative-level only — no named fields/flags/
+   endpoints/sections in the source. Test cases will be written at the behavior level described here;
+   nothing more specific will be invented."}
 ```
+
+**If narrative-only,** ask an extra question before the usual one: "This Design Spec has no
+implementation-level detail (no field/flag/endpoint names, no numbered sections) — is there a fuller
+technical doc I should fetch instead (a linked design doc, PRD, or engineering comments), or should I
+proceed generating tests strictly from this narrative?" If the user says to proceed, every later phase
+must still hold to the Core constraint: no invented names, `<not specified in Design Spec>` plus an Open
+Question wherever a test would otherwise need to reference something by name.
 
 Ask: "Is this the right Design Spec? Proceed with analysis, or should I fetch something else?"
 Wait for confirmation. If the user says this is the wrong page/ticket, ask for the correct URL/key and re-run 0.5.1–0.5.3.
@@ -744,7 +773,7 @@ Next steps:
 
 ## Quality Rules (apply throughout all phases)
 
-1. **Design Spec-only scope** — If a behavior is not in the Design Spec, do not test it. If it seems important, add it to Open Questions.
+1. **Design Spec-only scope** — If a behavior is not in the Design Spec, do not test it. If it seems important, add it to Open Questions. This includes names: never invent a flag/field/endpoint/config-key name or a spec section number that isn't literally in the source — see the Core constraint and §0.5.3's content sufficiency check.
 2. **No duplicate assertions** — Two tests that assert the same outcome for the same condition are one test.
 3. **Teardown in every test** — Every test that creates a relay config, RT policy, or feature flag change must include teardown in the last step(s).
 4. **Placeholder variables only** — Never hardcode IP addresses, pod names, tenant IDs, or email addresses. Use placeholders from `testrail_format_reference.md`.
