@@ -183,11 +183,50 @@ If `DESIGN_SPEC_INPUT` was a bare Jira key with no URL (no hostname to try), cal
 - Jira tickets for this team are often thin customer-request narratives, not the real Design Spec — and the Confluence link isn't always where you'd expect. Search **all three** of `description`, every entry in `comment.comments[].body`, and `issuelinks` for a Confluence URL (`/wiki/spaces/...`) — on real tickets it has shown up buried in a mid-thread engineering comment, not the description:
   - If found, ask the user once: "This ticket links to a Confluence page — `{title/url}`. Fetch that as the Design Spec too? (y/n)". If yes, also run the Confluence fetch below against that page and treat the combined content (Jira description + comments + linked Confluence body) as the Design Spec.
   - If not found, use the Jira issue's `description` + `comment` fields as the Design Spec content.
+- **Even a short/thin ticket can hide one concrete, literal requirement in its bullet list** — don't
+  let an overall "thin ticket" impression cause you to skim past individual bullets. Read every
+  bullet in the description line-by-line: a description that's mostly narrative can still contain
+  one specific technical bullet (naming a backing store, a data-extraction requirement, a field to
+  add) that belongs in the requirements map (§1.1) even when the rest of the ticket doesn't warrant
+  much. This was missed for real on ENG-993833 — the ticket read as thin narrative overall, but its
+  description contained the literal bullet "Extract forensic data from Ceph and add it to event,"
+  which was initially left out of the requirements map and only caught later when cross-checking
+  against a second draft (see Quality Rule 13).
 - Also scan `issuelinks` for a linked issue whose key matches `QE-\d+` (commonly summarized "QE activities for ..."). If found, surface it as a suggested `{QE_EPIC_LINK}` value for Phase 0 item 8c and ask the user to confirm/override rather than silently filling it in — don't skip asking just because a candidate was found.
 
 **If `DESIGN_SPEC_SOURCE = Confluence-MCP`:**
 - Extract the page ID from the URL (the numeric ID in `/pages/<id>/`, or the tiny-link ID after `/wiki/x/`).
 - Call `mcp__atlassian__getConfluencePage` with `pageId`, `cloudId`, `contentFormat: "markdown"`.
+
+### 0.5.2a Check for hidden macro content (Confluence fetches only)
+
+Confluence's `contentFormat: "markdown"` silently drops certain macros — most notably
+`swagger-open-api-macro` (embedded OpenAPI/Swagger specs) and other extension blocks — leaving a
+heading with **no body content** in the markdown output, even though the page visually shows full
+content there. This is a real, encountered failure mode, not a hypothetical: an "APIs" section
+fetched as markdown came back completely empty (the heading immediately followed by the next
+section's heading), while the live page actually contained a full embedded OpenAPI YAML spec with
+the exact field names/schemas the test plan needed.
+
+**Signal to watch for:** a Design Spec section that's referenced elsewhere in the doc (e.g. "see
+§2.2 API spec") or that appears in the table of contents, but whose fetched markdown body is empty
+or trivially short compared to what the heading implies.
+
+**When you see this signal:**
+1. Re-fetch the same page with `contentFormat: "html"` instead of `"markdown"`.
+2. Search the HTML body for `data-extension-key="swagger-open-api-macro"` (or other
+   `data-type="extension"` blocks) near that heading.
+3. The macro's real content is inside its `data-parameters` attribute as HTML-escaped JSON —
+   HTML-unescape it, JSON-parse it, then read `macroParams.__bodyContent.value` (for the Swagger
+   macro, this is the raw OpenAPI YAML text as a string). For large HTML pages, save the tool output
+   to a file and process it with a small `python3` script (`html.unescape` + `json.loads`) rather
+   than trying to eyeball/grep it inline.
+4. Treat whatever this recovers as fetched Design Spec content — same standing as anything else in
+   Phase 1, not something to speculate about further.
+
+Do not conclude a section is "not specified in the Design Spec" purely because its markdown fetch
+came back empty — check for this failure mode first, especially for any section whose name suggests
+machine-readable content (APIs, Schema, Configuration Reference).
 
 ### 0.5.3 Confirm before analyzing
 
@@ -458,6 +497,22 @@ their own feature works would skip. Concretely check for, and add a test when ap
   before or after it, but during?
 - **Reversal**: if the Design Spec adds a way to enable/set something, does it also work to
   disable/unset/delete it, and does that cleanly return to the prior state?
+- **Enum/variant coverage**: if the Design Spec's own examples or existing test list illustrate a
+  behavior using only one variant of a documented enum (e.g. one policy action out of several the
+  schema defines), add a test for at least one other variant — don't let the spec author's one
+  illustrative example become the only partition tested.
+- **Default/unconfigured state**: if a flag or config's default value is stated, add a test against
+  an entity that never explicitly set it (a fresh/unconfigured tenant, a never-toggled flag) to
+  confirm the default actually resolves that way in behavior — not only a test that explicitly sets
+  the flag to that value.
+- **Field/schema parity with an existing artifact**: if the Design Spec says a new artifact carries
+  "the same data" as, mirrors, or replaces part of an existing one, add a test that directly
+  cross-validates specific fields between the two (send the same input down both paths, diff the
+  results) rather than only validating the new artifact's shape in isolation.
+- **Cross-path/shared-infrastructure round-trip**: if the new feature's flag/config lives alongside
+  an existing feature's in the same config block, token, or pipeline, add a regression test that
+  exercises the *other* feature's full round-trip end-to-end — not just a presence/shape check on a
+  shared field.
 
 Every case this sweep surfaces must still trace back to something the Design Spec actually describes
 (per the Core constraint) — the sweep finds untested *dimensions* of stated behavior, it doesn't
@@ -806,6 +861,19 @@ Next steps:
     this happened for real). Publish mode always builds the body as HTML with `data-layout="full-width"`
     on wide tables (see Phase 4 Step 4) and visually confirms it via a browser screenshot when that
     tool is available — don't consider the page done just because the API call succeeded.
+13. **External/secondary sources are leads, not evidence** — a user may point you at a second source
+    to cross-check coverage: another AI tool's draft test plan, a colleague's notes, a prior team
+    doc. Use it exactly that way — as a prompt to re-examine material you can already fetch (the
+    Design Spec, linked Jira comments, `references/`, `kb/`) for something you missed, per the Core
+    constraint. A second source repeating the same unconfirmed detail is **not** independent
+    confirmation of it — two systems can converge on the same plausible-sounding fabrication
+    precisely because it sits near real, adjacent context (e.g. a storage mechanism mentioned
+    elsewhere in the architecture docs, but never stated for the specific feature under test). Every
+    test case added because of a secondary source must still trace to something in an
+    already-fetched primary source — if it doesn't, decline it exactly as you would a
+    self-generated guess, and say why. Conversely, don't dismiss a secondary source's suggestion
+    out of hand either — it can legitimately point back at a real requirement in a source you
+    already fetched but under-weighted (see the ENG-993833 Jira-bullet example in §0.5.2).
 
 ---
 
