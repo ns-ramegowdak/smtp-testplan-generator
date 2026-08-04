@@ -131,8 +131,9 @@ The KB captures reusable test patterns. Update it when you encounter something n
 
 1. Add the section to the appropriate KB file (`smtp_proxy_kb_api.md` or `smtp_proxy_kb_ui.md`) with a numbered heading (e.g. `## 19. New Feature Pattern`)
 2. Add a row to `smtp_proxy_kb_index.md` Step 2 section guide mapping the feature area to the new section number
-3. Test it: invoke the skill with a Design Spec that would need the new section and verify the skill reads it
+3. **Re-derive the Step 2b line-number map** in the same file (`grep -n '^##\|^###'` the KB file, recompute every section's range, and update the file's total-line count and the 60%-fallback numbers). Do this even if your addition is at the very end of the file — every earlier row is unaffected, but skipping this step is exactly how the map silently drifted before (see the warning at the bottom of Step 2b).
+4. Test it: invoke the skill with a Design Spec that would need the new section and verify the skill reads it
 
 ### How to update an existing pattern
 
-Edit the relevant section directly. KB files are plain Markdown — no special format required beyond the section numbering convention.
+Edit the relevant section directly. KB files are plain Markdown — no special format required beyond the section numbering convention. **If your edit adds or removes lines**, re-derive the Step 2b line-number map in `smtp_proxy_kb_index.md` for every section after your edit point — see step 3 above.

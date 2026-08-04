@@ -55,7 +55,7 @@ List control flags, feature flags, group_vars, provisioner flags, USRA flags if 
 
 ## Test Cases
 
-Full detail (Steps + Manual Execution Steps + Expected Results) is in the TestRail CSV: `{TICKET_ID}_{FEATURE_NAME}_testrail.csv`
+Full detail (Steps + Manual Execution Steps + Expected Results) is in the TestRail CSV: `{TESTRAIL_CSV_FILENAME}`
 
 | **S. No** | **Section** | **Test Categories(Type)** | **Service/Component** | **Test Summary** | **Steps** | **Manual Execution Steps** | **Expected Result** | **Priority(P0/P1/P2/P3)** | **Automatable (Yes/No)** | **Automated (Yes/No)** | **UI Case (Yes/No)** | **Arrived by QE (Yes/No)** | **Suggested by Dev (Yes/No)** | **Derived by AI (Yes/No)** |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
