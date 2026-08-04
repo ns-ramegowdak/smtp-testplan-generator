@@ -594,6 +594,29 @@ assert "request_id" in response
 destination specifically — an MSA/"inline-only" policy (e.g. targeting `custom_msa_2`) will not
 match plugin traffic. See `references/product_architecture.md` for why.
 
+### 18.1 Deferred event payload (`defer_event_gen`) — response schema
+
+Add `"defer_event_gen": true` to the request body (default staged-config gate `defer-event-gen` is
+enabled) to get `dlp_event_payload` back inline instead of the proxy auto-generating the
+Alert/Incident itself. Confirmed live schema as of the ENG-1156911 fix (2026-08-04) — this replaced
+an earlier shape, so check which one a given pod is actually returning before asserting on it:
+
+```python
+payload = response["dlp_event_payload"]
+payload["event_data"]           # identity/addressing — access_method, common.{app,object,user}, generic.strings.{from_user,to_user,subject,...}
+payload["inspection_results"]   # list, one entry per matched attachment/profile: matches[], metadata (Ceph forensic data for >=1MB attachments)
+payload["types"]                # {"alerts": {"generate": true}, "incidents": {"generate": true}}
+payload["symmetric_key"]        # {"key": "<base64, decodes to 16/24/32 raw bytes>", "key_mode": "gcm"} — POST-fix shape
+```
+
+**Pre-fix shape (still seen on pods that haven't picked up ENG-1156911 yet):**
+`payload["encryption"] = {"public_key_version": <int>, "symmetric_key": "<base64, decodes to 256 bytes — RSA-2048 ciphertext>", "symmetric_key_mode": "gcm"}`
+— note the `encryption` key and `public_key_version` field are both absent in the post-fix shape;
+don't assert both shapes at once, check `"encryption" in payload` first to know which build you're on.
+
+`defer_event_gen=false` or omitted (legacy path): `dlp_event_payload` is absent from the response
+entirely — the proxy auto-generates the Alert/Incident itself, same as pre-Phase-1 behavior.
+
 ## 19. Health Check Testing Pattern
 
 ```python
