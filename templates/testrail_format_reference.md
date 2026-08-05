@@ -2,10 +2,12 @@
 
 Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
          `/Users/ramegowdak/Downloads/SMTP_Proxy_DKIM_Verification_testrail.csv`
+         `/Users/ramegowdak/Desktop/ENG-993833_outlook_plugin_complete_37_cases.csv` (confirmed live-executed
+         format — this is the authoritative column set; it added `Execution Notes` as column 15)
 
 ---
 
-## Column Order (exact, positional)
+## Column Order (exact, positional — 16 columns)
 
 | # | Column Name | Description | Fixed Value? |
 |---|---|---|---|
@@ -22,8 +24,9 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 | 11 | UI Case | Always `No` for SMTP tests | Always: `No` |
 | 12 | QE Owner | Test owner name | Dynamic (user-provided, default: `Ramegowda K`) |
 | 13 | Suggested by Dev | Always `No` unless Design Spec specifies otherwise | Always: `No` |
-| 14 | Result | Empty for new tests | Always: `` (empty) |
-| 15 | Label | Tag for source tracking | Always: `ai_generated` |
+| 14 | Result | Pass/fail outcome once actually executed | Empty (``) for newly generated, not-yet-run test cases |
+| 15 | Execution Notes | Free-text notes from an actual test run — real values observed (log lines, tokens, pod names, tenant IDs), which policy/tenant it ran against, anything that deviated from the generic Steps | Empty (``) for newly generated, not-yet-run test cases — only ever filled in after a QE actually executes the case |
+| 16 | Label | Tag for source tracking | Always: `ai_generated` |
 
 ---
 
@@ -73,19 +76,22 @@ drive it (or the reason none exists, e.g. requires tcpdump/manual DNS control) �
 walkthrough for anyone executing it by hand lives in the separate **Manual Execution Steps** column
 below, not here.
 
+**Format: single continuous line, no embedded line breaks** — confirmed from the team's actual
+executed test plan (`ENG-993833_outlook_plugin_complete_37_cases.csv`). Do NOT put a newline between
+numbered steps; write the whole cell as one unbroken line, numbers inline:
+
 ```
-Automation Steps:
-1. <action using API/CLI/smtplib — include exact method names>
-2. <next action>
-3. <assertion — include exact code pattern, e.g. assert code == 250>
-N. Teardown: <cleanup actions>
+Automation Steps: 1. <action using API/CLI/smtplib — include exact method names> 2. <next action> 3. <assertion — include exact code pattern, e.g. assert code == 250> N. Teardown: <cleanup actions>
 ```
+
+(shown above wrapped for readability only — in the actual CSV cell this is one line with no `\n` characters)
 
 ### Step writing rules
 - Use placeholder variables for environment-specific values (see below)
 - Reference specific libraries: `smtplib.SMTP`, `kubectl exec`, `docker exec`, `ssh`
 - Include teardown as the last numbered step
 - If test is parametrized, note: `Test is parametrized: runs once with X and once with Y`
+- No embedded newlines — every step stays inline, separated by a space, on one continuous line
 
 ---
 
@@ -95,15 +101,14 @@ Every test case gets a Manual Execution Steps entry — this is the runbook a QE
 coding context follows to execute the test by hand and judge pass/fail, independent of whether
 automation exists yet.
 
+**Format: single continuous line, no embedded line breaks** — same rule as Steps above, confirmed from
+`ENG-993833_outlook_plugin_complete_37_cases.csv`:
+
 ```
-MANUAL STEPS:
-1. <plain-language prerequisite/setup action — product UI, email client, or a copy-pasteable command
-   with no explanation of what the code does>
-2. <plain-language action a human performs>
-3. Observe: <exactly what to look at and where>
-4. Confirm: <the pass/fail condition, in plain terms, matching Expected Result>
-5. Restore: <cleanup, in plain language>
+MANUAL STEPS: 1. <plain-language prerequisite/setup action — product UI, email client, or a copy-pasteable command with no explanation of what the code does> 2. <plain-language action a human performs> 3. Observe: <exactly what to look at and where> 4. Confirm: <the pass/fail condition, in plain terms, matching Expected Result> 5. Restore: <cleanup, in plain language>
 ```
+
+(shown above wrapped for readability only — in the actual CSV cell this is one line with no `\n` characters)
 
 ### Step writing rules
 - No API method names, assertion code, or library references (`assert`, `smtplib.SMTP(...)`, etc.) —
@@ -113,6 +118,7 @@ MANUAL STEPS:
   instruction a first-time reader can follow without prior context
 - Always include at least one `Observe:` step and one `Confirm:` step tied to the Expected Result
 - Include a plain-language `Restore:`/cleanup step last
+- No embedded newlines — every step stays inline, separated by a space, on one continuous line
 - **Never delegate a step to "Dev/SRE" or any other handoff** — this team has no separate Dev/SRE to
   hand off to; the QE running the test performs every step themselves. If the underlying action needs
   backend/pod access (tcpdump, config file checks, feature-flag state, kubectl exec), write it as a

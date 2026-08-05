@@ -662,7 +662,7 @@ would collide with the existing Phase 1 CSV (same `TICKET_ID`/`FEATURE_NAME`), u
 `smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_phase2_testrail.csv` instead so Phase 1 output is never overwritten.
 
 Rules:
-- Row 1: exact header from `testrail_format_reference.md` (15 columns)
+- Row 1: exact header from `testrail_format_reference.md` (16 columns)
 - One row per test case — **if `PHASE_MODE = Phase2`, only the `(P2-new)`/`(P1×P2-integration)` cases
   from §2.4/§3.2, never the "Already Covered by Phase 1" ones**
 - Use placeholder variables from `testrail_format_reference.md` for all environment values
