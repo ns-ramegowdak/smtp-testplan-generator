@@ -3,7 +3,11 @@
 Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
          `/Users/ramegowdak/Downloads/SMTP_Proxy_DKIM_Verification_testrail.csv`
          `/Users/ramegowdak/Desktop/ENG-993833_outlook_plugin_complete_37_cases.csv` (confirmed live-executed
-         format — this is the authoritative column set; it added `Execution Notes` as column 15)
+         format — added `Execution Notes` as column 15)
+         `/Users/ramegowdak/Desktop/ENG-993833_outlook_plugin_complete_42_cases.csv` (authoritative column
+         **naming** — this is the team's real TestRail import format; column names below match it exactly
+         for every concept it defines. `Automation Steps` is kept as an additional column beyond what that
+         file has, since it only carries manual-language steps in its single `Steps` column.)
 
 ---
 
@@ -11,12 +15,12 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 
 | # | Column Name | Description | Fixed Value? |
 |---|---|---|---|
-| 1 | Test Categories | Test type category | See allowed values below |
-| 2 | Sub-Type | ISTQB technique/outcome tag: `POS`, `NEG`, `BND`, `SEC`, `REG`, or `INTEG` (no brackets) | See §2.4 in SKILL.md |
-| 3 | Component | System under test | Always: `SMTP Proxy` |
-| 4 | Test Summary | One-line test title (imperative, starts with "Verify…") | Dynamic |
-| 5 | Steps | Automation-oriented numbered step list. Start with `Automation Steps:`. Exact method/API/CLI names — see Steps Format Rules | Dynamic |
-| 6 | Manual Execution Steps | Plain-language numbered step list a non-technical QE can follow by hand — no code/API jargon. Always populated, regardless of the Automatable value — see Manual Execution Steps Format Rules | Dynamic |
+| 1 | Type | Test type category | See allowed values below |
+| 2 | Test Sub-type | ISTQB technique/outcome tag: `POS`, `NEG`, `BND`, `SEC`, `REG`, or `INTEG` (no brackets) | See §2.4 in SKILL.md |
+| 3 | Sub Component | System under test | Always: `SMTP Proxy` |
+| 4 | Summary | One-line test title (imperative, starts with "Verify…") | Dynamic |
+| 5 | Automation Steps | Automation-oriented numbered step list. Start with `Automation Steps:`. Exact method/API/CLI names — see Automation Steps Format Rules | Dynamic |
+| 6 | Steps | Plain-language numbered step list a non-technical QE can follow by hand — no code/API jargon. Starts with `MANUAL STEPS:`. Always populated, regardless of the Automatable value — see Steps (Manual) Format Rules | Dynamic |
 | 7 | Expected Result | Bullet list of assertions, one per line | Dynamic |
 | 8 | Priority (P0/P1/P2/P3) | Risk-based priority | Dynamic |
 | 9 | Automatable | `Yes` or `No` | Dynamic |
@@ -25,12 +29,12 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 | 12 | QE Owner | Test owner name | Dynamic (user-provided, default: `Ramegowda K`) |
 | 13 | Suggested by Dev | Always `No` unless Design Spec specifies otherwise | Always: `No` |
 | 14 | Result | Pass/fail outcome once actually executed | Empty (``) for newly generated, not-yet-run test cases |
-| 15 | Execution Notes | Free-text notes from an actual test run — real values observed (log lines, tokens, pod names, tenant IDs), which policy/tenant it ran against, anything that deviated from the generic Steps | Empty (``) for newly generated, not-yet-run test cases — only ever filled in after a QE actually executes the case |
+| 15 | Execution Notes | Free-text notes from an actual test run — real values observed (log lines, tokens, pod names, tenant IDs), which policy/tenant it ran against, anything that deviated from the generic Automation Steps | Empty (``) for newly generated, not-yet-run test cases — only ever filled in after a QE actually executes the case |
 | 16 | Label | Tag for source tracking | Always: `ai_generated` |
 
 ---
 
-## Allowed Values — Test Categories
+## Allowed Values — Type
 
 | Value | When to use |
 |---|---|
@@ -44,7 +48,7 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 
 ---
 
-## Allowed Values — Sub-Type
+## Allowed Values — Test Sub-type
 
 | Value | When to use |
 |---|---|
@@ -68,12 +72,12 @@ Source: `/Users/ramegowdak/Downloads/SMTP_Proxy_Envelope_Testing_testrail.csv`
 
 ---
 
-## Steps Format Rules
+## Automation Steps Format Rules
 
-The **Steps** column is always automation-oriented — code/API/CLI level, whether or not the test is
-currently Automatable. If `Automatable=No`, Steps still records the technical mechanism that *would*
-drive it (or the reason none exists, e.g. requires tcpdump/manual DNS control) — the human-runnable
-walkthrough for anyone executing it by hand lives in the separate **Manual Execution Steps** column
+The **Automation Steps** column is always automation-oriented — code/API/CLI level, whether or not the
+test is currently Automatable. If `Automatable=No`, Automation Steps still records the technical
+mechanism that *would* drive it (or the reason none exists, e.g. requires tcpdump/manual DNS control) —
+the human-runnable walkthrough for anyone executing it by hand lives in the separate **Steps** column
 below, not here.
 
 **Format: single continuous line, no embedded line breaks** — confirmed from the team's actual
@@ -95,14 +99,13 @@ Automation Steps: 1. <action using API/CLI/smtplib — include exact method name
 
 ---
 
-## Manual Execution Steps Format Rules
+## Steps (Manual) Format Rules
 
-Every test case gets a Manual Execution Steps entry — this is the runbook a QE engineer without
-coding context follows to execute the test by hand and judge pass/fail, independent of whether
-automation exists yet.
+Every test case gets a Steps entry — this is the runbook a QE engineer without coding context follows
+to execute the test by hand and judge pass/fail, independent of whether automation exists yet.
 
-**Format: single continuous line, no embedded line breaks** — same rule as Steps above, confirmed from
-`ENG-993833_outlook_plugin_complete_37_cases.csv`:
+**Format: single continuous line, no embedded line breaks** — same rule as Automation Steps above,
+confirmed from `ENG-993833_outlook_plugin_complete_37_cases.csv`:
 
 ```
 MANUAL STEPS: 1. <plain-language prerequisite/setup action — product UI, email client, or a copy-pasteable command with no explanation of what the code does> 2. <plain-language action a human performs> 3. Observe: <exactly what to look at and where> 4. Confirm: <the pass/fail condition, in plain terms, matching Expected Result> 5. Restore: <cleanup, in plain language>
@@ -114,8 +117,8 @@ MANUAL STEPS: 1. <plain-language prerequisite/setup action — product UI, email
 - No API method names, assertion code, or library references (`assert`, `smtplib.SMTP(...)`, etc.) —
   describe the equivalent human action instead (e.g. "send an email from `<SENDER_EMAIL>` to
   `<RECIPIENT_EMAIL>` using your mail client" rather than `EmailBuilderSmtp.send_email(...)`)
-- Use placeholder variables from the table below the same way Steps does, but phrase each step as an
-  instruction a first-time reader can follow without prior context
+- Use placeholder variables from the table below the same way Automation Steps does, but phrase each
+  step as an instruction a first-time reader can follow without prior context
 - Always include at least one `Observe:` step and one `Confirm:` step tied to the Expected Result
 - Include a plain-language `Restore:`/cleanup step last
 - No embedded newlines — every step stays inline, separated by a space, on one continuous line

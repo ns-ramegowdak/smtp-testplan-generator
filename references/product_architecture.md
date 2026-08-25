@@ -341,6 +341,18 @@ the main proxy process:
 Config changes to health check behavior are staged: they are not live immediately after
 deployment, requiring a config push **and** a pod restart to take effect.
 
+## Incident-level workflow features (Incident Management System)
+
+Not every feature QE tests against SMTP DLP incidents lives in the scan/policy pipeline above. The
+Incidents > DLP page also hosts **incident-level approval workflows** — "Manager Escalation" (existing)
+and "Quarantine Release" escalation (NPLAN-7574, see `feature_matrix.md` row 41) — that are owned by a
+separate **Incident Management System (IMS)** service: a `workflow-engine-service` fronting AWS Step
+Functions and Lambda, not the SMTP Proxy pod. SMTP QE tests these because they act on SMTP DLP
+incidents and share the Incidents-page action dropdown, not because they're part of the DLP scan/RT
+policy pipeline described elsewhere in this file. A Design Spec describing a new incident-action
+workflow (approval emails, verdict routing, a Step Function) is this system, not the SMTP Proxy proper
+— don't look for it in the proxy's own config/pod when writing tests.
+
 ## Known architectural gotchas (apply when reasoning about impact)
 
 - Test-connection validation between O365 and Netskope is documented to "fail with an error even

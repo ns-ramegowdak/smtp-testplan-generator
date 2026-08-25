@@ -538,12 +538,12 @@ Assign a category tag to each test based on the technique and outcome:
 - `[INTEG]` — only when `PHASE_MODE = Phase2`: a test on a requirement annotated `(P1×P2-integration)`.
   Steps must exercise the Phase 1 flow WITH the Phase 2 change active (e.g. Phase 2 flag on, Phase 2 config
   set) and assert the combined behavior — not the Phase 2 behavior in isolation, and not a re-run of an
-  existing Phase 1 test. Use TestRail `Test Categories=Integration` for these rows (§Step 2 of Phase 4).
+  existing Phase 1 test. Use TestRail `Type=Integration` for these rows (§Step 2 of Phase 4).
 
 Keep the tag attached to the test case internally (draft table, dedup/coverage checks, CSV/Confluence
-generation) but never prepend it to the Test Summary text — the Summary stays a plain `Verify ...`
-sentence. The tag is written out only in the dedicated Sub-Type column (CSV) / Test Categories(Type)
-column (Confluence) — see Phase 4 Step 2 and Step 3.
+generation) but never prepend it to the summary text — the Summary (CSV) / Test Summary (Confluence)
+stays a plain `Verify ...` sentence. The tag is written out only in the dedicated Test Sub-type column
+(CSV) / Test Categories(Type) column (Confluence) — see Phase 4 Step 2 and Step 3.
 
 ---
 
@@ -662,25 +662,27 @@ would collide with the existing Phase 1 CSV (same `TICKET_ID`/`FEATURE_NAME`), u
 `smtp_testplan/{TICKET_ID}_{FEATURE_NAME}_phase2_testrail.csv` instead so Phase 1 output is never overwritten.
 
 Rules:
-- Row 1: exact header from `testrail_format_reference.md` (16 columns)
+- Row 1: exact header from `testrail_format_reference.md` (16 columns: `Type`, `Test Sub-type`,
+  `Sub Component`, `Summary`, `Automation Steps`, `Steps`, `Expected Result`, `Priority`, `Automatable`,
+  `Automated`, `UI Case`, `QE Owner`, `Suggested by Dev`, `Result`, `Execution Notes`, `Label`)
 - One row per test case — **if `PHASE_MODE = Phase2`, only the `(P2-new)`/`(P1×P2-integration)` cases
   from §2.4/§3.2, never the "Already Covered by Phase 1" ones**
 - Use placeholder variables from `testrail_format_reference.md` for all environment values
-- Test Summary column: plain `Verify ...` sentence — never prepend the `[POS]/[NEG]/[BND]/[SEC]/[REG]/[INTEG]`
+- Summary column: plain `Verify ...` sentence — never prepend the `[POS]/[NEG]/[BND]/[SEC]/[REG]/[INTEG]`
   tag here (see §2.4)
-- Sub-Type column (Column 2): the test's category tag from §2.4 written **without brackets** —
+- Test Sub-type column (Column 2): the test's category tag from §2.4 written **without brackets** —
   `POS`, `NEG`, `BND`, `SEC`, `REG`, or `INTEG`
-- Steps column: multi-line, wrapped in double quotes, numbered list starting with `Automation Steps:` —
-  code/API/CLI level, per Steps Format Rules
-- Manual Execution Steps column: multi-line, wrapped in double quotes, numbered list starting with
-  `MANUAL STEPS:` — plain-language, human-executable, per Manual Execution Steps Format Rules. Fill
+- Automation Steps column: multi-line, wrapped in double quotes, numbered list starting with
+  `Automation Steps:` — code/API/CLI level, per Automation Steps Format Rules
+- Steps column: multi-line, wrapped in double quotes, numbered list starting with
+  `MANUAL STEPS:` — plain-language, human-executable, per Steps (Manual) Format Rules. Fill
   this in for **every** row, not only rows where `Automatable=No`
 - Expected Result column: multi-line, wrapped in double quotes, bullet list starting with `-`
-- Fixed columns: `Component=SMTP Proxy`, `Automated=No`, `UI Case=No`, `Result=`, `Label=ai_generated`
+- Fixed columns: `Sub Component=SMTP Proxy`, `Automated=No`, `UI Case=No`, `Result=`, `Label=ai_generated`
 - `Suggested by Dev=No` unless Design Spec explicitly attributes a test to a dev suggestion
 - `QE Owner={QE_OWNER}`
-- `[REG]`-tagged test cases (§2.4) use `Test Categories=Regression` in Column 1 and `Sub-Type=REG` in Column 2
-- `[INTEG]`-tagged test cases (§2.4) use `Test Categories=Integration` in Column 1 and `Sub-Type=INTEG` in Column 2
+- `[REG]`-tagged test cases (§2.4) use `Type=Regression` in Column 1 and `Test Sub-type=REG` in Column 2
+- `[INTEG]`-tagged test cases (§2.4) use `Type=Integration` in Column 1 and `Test Sub-type=INTEG` in Column 2
 
 ### Step 3: Build the Confluence page content
 
