@@ -426,3 +426,40 @@ workflow (approval emails, verdict routing, a Step Function) is this system, not
   around 250 emails/min per egress source IP (produces frequent `421` soft errors and TCP resets),
   and any existing email footer gets duplicated (ENG-199485). Don't flag these as proxy regressions
   when testing against the Gmail Relay next hop specifically.
+- **The RT Policy WebUI's "Email Outbound App" destination picker has two separate categories, and
+  each has its own independent action dropdown** (confirmed via live UI screenshots, 2026-09-05):
+  **`SMTP MAIL SERVER`** — the classic/SMTP-transport path (Exchange, O365, Gmail, and any number of
+  arbitrarily-named Custom MSAs) — and **`ENDPOINT EMAIL SCAN PLUGIN`**, which always contains
+  exactly one fixed, non-renameable entry: **`Microsoft Outlook`** (the Outlook desktop-client plugin
+  scanning mail before send, i.e. the REST ingestion in row 31 of `feature_matrix.md`). Selecting
+  apps from both categories in the same policy (a "combined-destination" policy) surfaces two
+  side-by-side action dropdowns in Profile & Action:
+  - **"Action by SMTP Proxy"** (maps to `dlp_actions[].actions[]` in the API) — options are
+    **Alert, Allow, Add SMTP Header, Remove Recipients only. There is no Block or User Alert option
+    here at all** — the classic/SMTP path has no hard-reject action; the closest available mitigation
+    is Remove Recipients.
+  - **"Action by Endpoint"** (maps to `dlp_actions[].plugin_actions[]` in the API) — options are
+    **Alert, Allow, User Alert, Block** (User Alert/Block also carry a `template` key naming the
+    justify/block page the EPDLP gateway renders) — **no Add SMTP Header or Remove Recipients here.**
+
+  Putting an Endpoint-only action name (`useralert`/`block`) into the classic `actions[]` field —
+  even on a policy with no Outlook Plugin/Endpoint app targeted at all — causes `deploy_all`/"apply
+  config changes" to fail with "Failed to apply Real Time Protection Policy", a failure mode that
+  reads identically to unrelated pod-health flakiness in the logs. **A test plan that wants "the
+  classic/SMTP path rejects the email" as an observable outcome is describing a capability that does
+  not exist** — don't design a test case around a classic-path hard block; the achievable classic
+  actions are limited to the four above.
+- **Email Quarantine Release (NPLAN-7574, `feature_matrix.md` row 41) fails outright once a
+  quarantined message has more than one recipient (ENG-1314170, confirmed P0/Blocker).** The
+  release API (`POST /smtp/quarantinerelease`) resolves *which* quarantined Exchange message to act
+  on by matching `internet_message_id` + received-date only — it carries no per-recipient
+  disambiguation. With 2+ recipients (To, or To+Cc, including recipients on the same domain), more
+  than one quarantined copy matches that pair, and Exchange returns
+  `422 "More than one quarantined message matches the requested message ID and received date, so
+  none of them was released."` **No recipient gets released** — not a partial-failure, both Direct
+  Release and the Escalation-approval release path hit this identically. The Design Spec
+  (Confluence page 8075281908) never documents this matching logic or mentions recipient count as a
+  variable at all; it only carries `recipients` through as notification-email text. **Test
+  implication:** any test plan touching this feature (or its Phase 2, if one follows) must include
+  release with 2+ recipients as a first-class case, not just the single-recipient happy path this
+  Design Spec implicitly assumed throughout.

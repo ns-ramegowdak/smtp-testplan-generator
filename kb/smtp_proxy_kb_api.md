@@ -594,6 +594,23 @@ assert "request_id" in response
 destination specifically — an MSA/"inline-only" policy (e.g. targeting `custom_msa_2`) will not
 match plugin traffic. See `references/product_architecture.md` for why.
 
+**`dlp_actions[]` action-name validity is split by destination — get this wrong and policy deploy
+fails** (see the `product_architecture.md` gotcha for the full explanation and UI evidence):
+
+```python
+policy_hash['dlp_actions'] = [{
+    "dlp_profile": "EU General Data Protection Regulation (GDPR)",
+    # Endpoint leg (Outlook Plugin) — only allow/alert/useralert/block valid here.
+    "plugin_actions": [{"action_name": "block", "template": "epdlp_content_block_page.html"}],
+    # Classic/SMTP leg — only allow/alert/add_header/remove_recipient valid here.
+    # NEVER put block/useralert in this list, even on a policy with no Endpoint app targeted —
+    # it breaks deploy_all with "Failed to apply Real Time Protection Policy".
+    "actions": [{"action_name": "alert"}],
+}]
+```
+`_PLUGIN_ACTION_TEMPLATES = {"block": "epdlp_content_block_page.html", "useralert": "epdlp_content_useralert_justify.html"}`
+— required whenever `plugin_actions` uses `block`/`useralert`; omit `template` for `allow`/`alert`.
+
 ### 18.1 Deferred event payload (`defer_event_gen`) — response schema
 
 Add `"defer_event_gen": true` to the request body (default staged-config gate `defer-event-gen` is
