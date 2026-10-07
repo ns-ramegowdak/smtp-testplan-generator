@@ -211,6 +211,51 @@ builder.send_email(from_email="user0@emailskope.com", to_email="fireeyesales2@gm
     custom_headers={"x-custom-msa": "test"})
 ```
 
+### 17.15 Domain Verification Flow ("Verify Email Domain") — security test mechanics (ENG-679247)
+
+Added 2026-10-07 from the manual security verification of ENG-679247 (verified fixed by
+ENG-1082920, Rel 143; feature-matrix row 43). Backend contract: `POST /settings/emailRelayCfg//sendEmailVerification`
+(emails a 5-minute-validity OTP, subject `"Netskope: Verification Code for Email Routing"`,
+to an address **on the domain being added**) and `POST /settings/emailRelayCfg//validateVerificationCode`
+(server-side `hash_equals` match; writes a session proof). The SAVE path (`setEmailRelayCfg`)
+re-validates every claimed-verified domain server-side — tampered/absent proof →
+`{"status":"error","errors":["Some of the domains are not verified. Please refresh the page and reverify."]}`.
+
+UI quirks confirmed live (custom MSA path: "+" tile → `a.option` "+ Create a custom MSA"):
+- Verify sub-dialog is titled **"Verify Email Domain"**; its send button is **SEND EMAIL**
+  (not "Send Verification Code" as the ticket's PoC prose says). Its code input has **NO
+  placeholder/aria-label** — locate it as the empty `input[type=text]` under the
+  "Email has been sent to: …" text, not by a `/code/i` selector.
+- The custom-MSA **name** field placeholder is "Enter custom MSA name" — a generic
+  "first empty text input" fill lands in the Source IP Allowlist instead (error:
+  "Enter valid IPv4 Address or CIDR (24-32).").
+- OTP recipient must **match the domain being added** — a subdomain of geskope.com with a
+  `@geskope.com` recipient errors: "This email address does not match the specified email
+  domain {domain}". Use the real domain for the OTP path.
+- App card cleanup: the card's app name is in the **icon's `title` attr** (not innerText);
+  delete via `card.querySelector('[aria-label="Close icon"]')` → confirm dialog **YES**.
+  Never touch the built-in MSA cards (Microsoft Office 365 Exchange / Outlook / Gmail).
+
+Security-test pattern (both directions, automatable headlessly with Playwright — no Burp):
+```python
+# (a) tamper test: wrong code + response flip → save MUST be rejected server-side
+context.route("**/validateVerificationCode*", lambda route: route.fulfill(
+    status=200, content_type="application/json; charset=UTF-8",
+    body='{"status":"success","msg":"","data":true}'))
+# ... enter wrong code, VERIFY (UI shows cosmetic ✓), click SAVE
+# assert: rejection toast text above appears AND reload shows nothing persisted
+
+# (b) genuine test: real code, no tampering → verify + save succeeds
+# assert: setEmailRelayCfg response {"status":"success","data":"Email Relay Config saved successfully"}
+```
+OTP extraction: regex `Verification Code:\s*(\d{4,8})` on the email body — a generic
+4–8-digit regex matches template junk (e.g. `7900` appears in the email HTML but is NOT
+the code). Mailbox read via the app-only Graph creds in
+`nsproxy/tests/api/data/SMTP/smtp_proxy/email_accounts.json` — the same app credentials
+can read `mailbox(resource='ramegowdak@geskope.com')` even though only
+`mnagarajan@geskope.com` has a creds entry. Filter messages by `received >= send time`
+(`msg.received` is tz-aware +05:30); codes expire after 5 minutes.
+
 ---
 
 ## 18. UI Layer — Alerts / Application Events / Incidents Page Patterns

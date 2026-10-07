@@ -49,6 +49,7 @@ Do NOT read the full KB files. Use this table to load only what the Design Spec 
 | Feature area in Design Spec | Read sections |
 |---|---|
 | SMTP Settings page (MSA config, Exchange/Gmail/Custom) | §17.1–17.9 |
+| Email domain verification / OTP flow / response-tamper security test | §17.15 |
 | Record Subject Line feature | §17.9 |
 | Source IP allow list / ipset | §17.7 |
 | Alerts / Application Events / Incidents new fields | §18.1–18.10 |
@@ -129,11 +130,11 @@ below; it had drifted by up to 64 lines after §3.3 in the api file before this 
 | §21 Machine-Generated Email Detection | 654–667 |
 | §22 Common Placeholder Variables | 668–686 |
 
-### smtp_proxy_kb_ui.md (405 lines)
+### smtp_proxy_kb_ui.md (450 lines)
 
 | Section | Lines |
 |---|---|
-| §17 SMTP Settings Page Tests (all) | 8–215 |
+| §17 SMTP Settings Page Tests (all) | 8–260 |
 | §17.1 Page Object and Navigation | 12–28 |
 | §17.2 Nav Bar Assertions | 29–44 |
 | §17.3 MSA Cards | 45–57 |
@@ -147,18 +148,19 @@ below; it had drifted by up to 64 lines after §3.3 in the api file before this 
 | §17.11 Accessibility Tests | 167–182 |
 | §17.12 UI Fixtures (feature flag provisioner) | 183–195 |
 | §17.13 UI Input Data Files | 196–203 |
-| §17.14 Generate SMTP Traffic for UI Tests | 204–215 |
-| §18 Alerts/Events/Incidents (all) | 216–341 |
-| §18.1 Page URLs and Navigation | 220–235 |
-| §18.2 Alerts Table Columns | 236–240 |
-| §18.3 Application Events Table Columns | 241–245 |
-| §18.4 Feature-Flag-Controlled Column Pattern | 246–251 |
-| §18.5 Side Panel Structure | 252–276 |
-| §18.6 Conditional Field Display Pattern | 277–288 |
-| §18.7 Filter Pattern | 289–303 |
-| §18.8 Column Customize Dialog | 304–311 |
-| §18.9 Feature Flag Toggle for UI Column Visibility | 312–324 |
-| §18.10 Accessing Side Panel Fields by Label | 325–341 |
+| §17.14 Generate SMTP Traffic for UI Tests | 204–213 |
+| §17.15 Domain Verification Flow / response-tamper security test (ENG-679247) | 214–260 |
+| §18 Alerts/Events/Incidents (all) | 261–386 |
+| §18.1 Page URLs and Navigation | 265–280 |
+| §18.2 Alerts Table Columns | 281–285 |
+| §18.3 Application Events Table Columns | 286–290 |
+| §18.4 Feature-Flag-Controlled Column Pattern | 291–296 |
+| §18.5 Side Panel Structure | 297–321 |
+| §18.6 Conditional Field Display Pattern | 322–333 |
+| §18.7 Filter Pattern | 334–348 |
+| §18.8 Column Customize Dialog | 349–356 |
+| §18.9 Feature Flag Toggle for UI Column Visibility | 357–369 |
+| §18.10 Accessing Side Panel Fields by Label | 370–386 |
 | §23 Additional Page Objects & UI Test Areas (all) | 342–405 |
 | §23.1 Custom Tenant Identification settings page | 357–368 |
 | §23.2 DNS Domain Validation UI (two generations) | 369–376 |
